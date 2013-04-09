@@ -104,6 +104,7 @@ pub mod middle {
     pub mod lang_items;
     pub mod privacy;
     pub mod moves;
+    pub mod builtin;
 }
 
 pub mod front {

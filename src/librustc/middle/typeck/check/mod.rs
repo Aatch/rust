@@ -3389,8 +3389,8 @@ pub fn check_bounds_are_used(ccx: @mut CrateCtxt,
     }
 }
 
-pub fn check_intrinsic_type(ccx: @mut CrateCtxt, it: @ast::foreign_item) {
-    fn param(ccx: @mut CrateCtxt, n: uint) -> ty::t {
+pub fn check_intrinsic_type(ccx: &CrateCtxt, it: @ast::foreign_item) {
+    fn param(ccx: &CrateCtxt, n: uint) -> ty::t {
         ty::mk_param(ccx.tcx, n, local_def(0))
     }
     fn arg(m: ast::rmode, ty: ty::t) -> ty::arg {

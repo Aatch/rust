@@ -2278,8 +2278,11 @@ pub fn create_entry_wrapper(ccx: @CrateContext,
             llvm::LLVMBuildAlloca(bld, ccx.int_type, noname())
         };
 
+        let crate_map = ccx.crate_map;
+        let opaque_crate_map = unsafe {llvm::LLVMBuildPointerCast(
+                bld, crate_map, T_ptr(T_i8()), noname())};
+
         let (start_fn, args) = if use_start_lang_item {
-            let crate_map = ccx.crate_map;
             let start_def_id = ccx.tcx.lang_items.start_fn();
             let start_fn = if start_def_id.crate == ast::local_crate {
                 ccx.sess.bug(~"start lang item is never in the local crate")
@@ -2288,9 +2291,6 @@ pub fn create_entry_wrapper(ccx: @CrateContext,
                         start_def_id).ty;
                 trans_external_path(ccx, start_def_id, start_fn_type)
             };
-
-            let opaque_crate_map = llvm::LLVMBuildPointerCast(
-                    bld, crate_map, T_ptr(T_i8()), noname());
 
             let args = unsafe {
                 let opaque_rust_main = llvm::LLVMBuildPointerCast(

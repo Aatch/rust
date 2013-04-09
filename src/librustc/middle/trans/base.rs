@@ -2307,7 +2307,7 @@ pub fn create_entry_wrapper(ccx: @CrateContext,
             };
             (start_fn, args)
         } else {
-            debug!("User defined start fn");
+            debug!("using user-defined start fn");
             let args = unsafe {
                 ~[ retptr,
                    C_null(T_opaque_box_ptr(ccx)),

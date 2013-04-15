@@ -64,14 +64,8 @@ define_builtins!(
     atomic_cxchg_rel
 )
 
-pub enum TranslationType {
-    Wrapper,
-    CallSite
-}
-
 pub struct BuiltInDesc {
     bi: b::BuiltIn,
-    trans_ty: TranslationType,
     nptys: uint,
     inputs: ~[ty::arg],
     output: ty::t,

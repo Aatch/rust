@@ -131,6 +131,8 @@ pub fn syntax_expander_table() -> SyntaxEnv {
                                 ext::tt::macro_rules::add_new_extension));
     syntax_expanders.insert(@~"fmt",
                             builtin_normal_tt(ext::fmt::expand_syntax_ext));
+    syntax_expanders.insert(@~"writef",
+                            builtin_normal_tt(ext::writef::expand_syntax_ext));
     syntax_expanders.insert(
         @~"auto_encode",
         @SE(ItemDecorator(ext::auto_encode::expand_auto_encode)));

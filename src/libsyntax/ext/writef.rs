@@ -27,10 +27,6 @@ pub fn expand_syntax_ext(cx: @ext_ctxt, sp: span, tts: &[ast::token_tree])
         let mut parser = fmt::parse::Parser::new(fmtstr, &fmt::printf::printf_desc);
         let mut count = 0;
 
-        let runtime_spec_id = ~[
-        cx.ident_of(~"core"),
-        cx.ident_of(~"fmt"),
-        cx.ident_of(~"RTSpec") ];
         let write_str = cx.ident_of(~"write_str");
         let stmts = do vec::build |push| {
         loop {
@@ -50,8 +46,18 @@ pub fn expand_syntax_ext(cx: @ext_ctxt, sp: span, tts: &[ast::token_tree])
                 }
                 };
 
+                let opt_none = mk_path_global(cx, arg.span, ~[
+                    cx.ident_of(~"core"),
+                    cx.ident_of(~"option"),
+                    cx.ident_of(~"None"),
+                ]);
+
+                let flags = mk_base_vec_e(cx, arg.span, ~[]);
+
                 // this should be factored into core::fmt
                 let method;
+                let mut call_args = ~[ writer, copy opt_none, opt_none, flags ];
+
                 match spc.specifier {
                 's' => {
                     match spc.num_arg {
@@ -68,6 +74,7 @@ pub fn expand_syntax_ext(cx: @ext_ctxt, sp: span, tts: &[ast::token_tree])
                 }
                 'd' => {
                     method = ~"format_d";
+                    call_args.push(mk_uint(cx, arg.span, 10));
                 }
                 'f' => {
                     method = ~"format_f";
@@ -83,19 +90,15 @@ pub fn expand_syntax_ext(cx: @ext_ctxt, sp: span, tts: &[ast::token_tree])
                     let item = build::mk_method_call(cx, sp,
                                      writer, write_str,
                                      ~[str_call]);
-                    push(build::mk_stmt(cx, sp, item));
+                    push(build::mk_stmt(cx, arg.span, item));
                     loop;
                 }
                 _ => fail!("Unknown specifier")
                 }
-                // XXX: runtime spec
-                let runtime_spec = build::mk_global_struct_e(cx, sp,
-                                     copy runtime_spec_id,
-                                     ~[] );
-                let item = build::mk_method_call(cx, sp,
+                let item = build::mk_method_call(cx, arg.span,
                                  arg, cx.ident_of(method),
-                                 ~[ writer, runtime_spec ]);
-                push(build::mk_stmt(cx, sp, item));
+                                 call_args);
+                push(build::mk_stmt(cx, arg.span, item));
             }
             fmt::parse::Raw(str) => {
                 let str = build::mk_base_str(cx, sp, str.to_owned());

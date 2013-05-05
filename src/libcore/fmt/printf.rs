@@ -24,19 +24,19 @@ pub static printf_desc : ParserDesc<'static> = ParserDesc {
 // unfortunately the cruft in io means not using @Writer is hard, this
 // should change when io gets redone
 pub trait Formatter {
-    fn format(&self, @Writer, Spec);
+    fn format(&self, @Writer, Option<int>, Option<int>, &[char]);
 }
 
 pub trait IntFormat {
-    fn format_d(&self, @Writer, Spec);
+    fn format_d(&self, @Writer, Option<int>, Option<int>, &[char], uint);
 }
 
 pub trait FloatFormat {
-    fn format_f(&self, @Writer, Spec);
+    fn format_f(&self, @Writer, Option<int>, Option<int>, &[char]);
 }
 
 pub trait StrFormat {
-    fn format_s(&self, @Writer, Spec);
+    fn format_s(&self, @Writer, Option<int>, Option<int>, &[char]);
 }
 
 pub enum Alignment {
@@ -80,13 +80,23 @@ pub fn align_field(contents: ~str, width:uint, align:Alignment) -> ~str {
 macro_rules! naive_impl{
     ($trt:ident, $mthd:ident, $ty:ty) => {
         impl $trt for $ty {
-            fn $mthd(&self, w: @Writer, _s: Spec) {
+            fn $mthd(&self, w: @Writer, _wdth:Option<int>, _prec:Option<int>, _flags:&[char]) {
                 w.write_str(self.to_str());
             }
         }
     }
 }
-macro_rules! df{ ($ty:ty) => { naive_impl!(IntFormat, format_d, $ty) } }
+
+macro_rules! df{
+    ($ty:ty) => {
+        impl IntFormat for $ty {
+            fn format_d(&self, w: @Writer, _wdth:Option<int>, _prec:Option<int>, _flags:&[char], _base:uint) {
+                w.write_str(self.to_str());
+            }
+        }
+    }
+}
+
 macro_rules! ff{ ($ty:ty) => { naive_impl!(FloatFormat, format_f, $ty) } }
 macro_rules! sf{ ($ty:ty) => { naive_impl!(StrFormat, format_s, $ty) } }
 
@@ -98,12 +108,12 @@ ff!{float} ff!{f32} ff!{f64}
 // needs char::to_str
 // sf!{char}
 impl StrFormat for char {
-    fn format_s(&self, w: @Writer, _s: Spec) {
+    fn format_s(&self, w: @Writer, _width: Option<int>, _prec: Option<int>, _flags: &[char]) {
         w.write_char(*self)
     }
 }
 impl<'self> StrFormat for &'self str {
-    fn format_s(&self, w: @Writer, _s: Spec) {
+    fn format_s(&self, w: @Writer, _width: Option<int>, _prec: Option<int>, _flags: &[char]) {
         w.write_str(*self)
     }
 }

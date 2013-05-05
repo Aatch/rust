@@ -23,14 +23,14 @@ pub fn expand_syntax_ext(cx: @ext_ctxt, sp: span, tts: &[ast::token_tree])
     [] | [_] => cx.span_fatal(sp, "writef! takes at least 2 arguments."),
     [writer, rawfmt, .. args] => {
         let fmtstr = expr_to_str(cx, rawfmt,
-                  expr_to_str);
-        let parser = fmt::parse::Parser::new(fmtstr, &fmt::printf::printf_desc);
+                  ~"Format string must be a string literal");
+        let mut parser = fmt::parse::Parser::new(fmtstr, &fmt::printf::printf_desc);
         let mut count = 0;
 
         let runtime_spec_id = ~[
-        cx.ident_of("core"),
-        cx.ident_of("fmt"),
-        cx.ident_of("RTSpec") ];
+        cx.ident_of(~"core"),
+        cx.ident_of(~"fmt"),
+        cx.ident_of(~"RTSpec") ];
         let write_str = cx.ident_of(~"write_str");
         let stmts = do vec::build |push| {
         loop {
@@ -56,7 +56,7 @@ pub fn expand_syntax_ext(cx: @ext_ctxt, sp: span, tts: &[ast::token_tree])
                 's' => {
                     match spc.num_arg {
                     Some(i) =>  {
-                        cx.warn(
+                        cx.span_warn(
                         sp,
                         fmt!("`<%d>` flag has no effect with specifier `s`",
                              i))
@@ -82,10 +82,11 @@ pub fn expand_syntax_ext(cx: @ext_ctxt, sp: span, tts: &[ast::token_tree])
                     ~[ arg ]);
                     let item = build::mk_method_call(cx, sp,
                                      writer, write_str,
-                                     str_call);
+                                     ~[str_call]);
                     push(build::mk_stmt(cx, sp, item));
                     loop;
                 }
+                _ => fail!("Unknown specifier")
                 }
                 // XXX: runtime spec
                 let runtime_spec = build::mk_global_struct_e(cx, sp,
@@ -100,20 +101,20 @@ pub fn expand_syntax_ext(cx: @ext_ctxt, sp: span, tts: &[ast::token_tree])
                 let str = build::mk_base_str(cx, sp, str.to_owned());
                 let item = build::mk_method_call(cx, sp,
                                   writer, write_str,
-                                  str);
+                                  ~[str]);
                 push(build::mk_stmt(cx, sp, item));
             }
-            fmt::parse::Error {msg:msg, pos:pos} => {
-                // XXX: give position within format string
-                cx.span_fatal(sp, fmt!("error parsing format string: %s", msg));
-            }
             fmt::parse::End => break,
+            _ => {
+                // XXX: give position within format string
+                cx.span_fatal(sp, fmt!("error parsing format string"));
+            }
             }
         }
         };
         if count != args.len() {
         cx.span_warn(sp,
-                 fmt!("Incorrect number of arguments to writef!: %d but expecting %d",
+                 fmt!("Incorrect number of arguments to writef!: %u but expecting %u",
                   args.len(), count));
         }
         let blck = build::mk_block(cx, sp, ~[], stmts, None);

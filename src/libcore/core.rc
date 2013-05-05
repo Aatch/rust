@@ -239,6 +239,9 @@ pub mod condition;
 pub mod logging;
 pub mod util;
 
+#[cfg(not(stage0))]
+#[path = "fmt/mod.rs"]
+pub mod fmt;
 
 /* Unsupported interfaces */
 

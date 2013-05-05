@@ -75,6 +75,8 @@ pub mod ext {
 
 
     pub mod fmt;
+    #[cfg(not(stage0))]
+    pub mod writef;
     pub mod env;
     pub mod bytes;
     pub mod concat_idents;

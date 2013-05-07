@@ -12,7 +12,7 @@ use fmt::parse::*;
 use prelude::*;
 
 use io::{Writer,WriterUtil};
-use option::Some;
+use num::ToStrRadix;
 
 pub static printf_desc : ParserDesc<'static> = ParserDesc {
     indicator: '%',
@@ -21,6 +21,15 @@ pub static printf_desc : ParserDesc<'static> = ParserDesc {
     specifiers: ['d', 'f', 's', '?']
 };
 
+// (specifier, method name, whether to pass the numeric flag
+pub static printf_handlers: &'static [(char, &'static str, bool)] =
+    &[
+        ('d', "format_d", true),
+        ('f', "format_f", true),
+        ('s', "format_s", false),
+        ('?', "format_poly", false)
+    ];
+
 // unfortunately the cruft in io means not using @Writer is hard, this
 // should change when io gets redone
 pub trait Formatter {
@@ -28,15 +37,25 @@ pub trait Formatter {
 }
 
 pub trait IntFormat {
-    fn format_d(&self, @Writer, Option<int>, Option<int>, &[char], uint);
+    fn format_d(&self, @Writer, Option<int>, Option<int>, &[char], Option<uint>);
 }
 
 pub trait FloatFormat {
-    fn format_f(&self, @Writer, Option<int>, Option<int>, &[char]);
+    fn format_f(&self, @Writer, Option<int>, Option<int>, &[char], Option<uint>);
 }
 
 pub trait StrFormat {
     fn format_s(&self, @Writer, Option<int>, Option<int>, &[char]);
+}
+
+/// dummy trait so that every type has the `.format_poly` method
+pub trait PolyFormat {
+    fn format_poly(&self, @Writer, Option<int>, Option<int>, &[char]);
+}
+impl<A> PolyFormat for A {
+    fn format_poly(&self, w: @Writer, _: Option<int>, _: Option<int>, _: &[char]) {
+        ::repr::write_repr(w, self);
+    }
 }
 
 pub enum Alignment {
@@ -80,24 +99,41 @@ pub fn align_field(contents: ~str, width:uint, align:Alignment) -> ~str {
 macro_rules! naive_impl{
     ($trt:ident, $mthd:ident, $ty:ty) => {
         impl $trt for $ty {
-            fn $mthd(&self, w: @Writer, _wdth:Option<int>, _prec:Option<int>, _flags:&[char]) {
-                w.write_str(self.to_str());
+            fn $mthd(&self, w: @Writer, width:Option<int>, _prec:Option<int>, flags:&[char]) {
+                let str = self.to_str();
+                let str = match width {
+                    Some(i) => align_field(str, i as uint, Right),
+                    None => str
+                }
+                w.write_str(str);
             }
         }
     }
 }
 
-macro_rules! df{
-    ($ty:ty) => {
-        impl IntFormat for $ty {
-            fn format_d(&self, w: @Writer, _wdth:Option<int>, _prec:Option<int>, _flags:&[char], _base:uint) {
-                w.write_str(self.to_str());
+macro_rules! num_impl{
+    ($trt:ident, $mthd:ident, $ty:ty) => {
+        impl $trt for $ty {
+            fn $mthd(&self, w: @Writer,
+                     width: Option<int>, _prec: Option<int>,
+                     _flags: &[char], base: Option<uint>) {
+                let base = match base {
+                    Some(i) => i,
+                    None => 10
+                };
+                let str = self.to_str_radix(base);
+                let str = match width {
+                    Some(i) => align_field(str, i as uint, Right),
+                    None => str
+                };
+                w.write_str(str);
             }
         }
     }
 }
 
-macro_rules! ff{ ($ty:ty) => { naive_impl!(FloatFormat, format_f, $ty) } }
+macro_rules! df{ ($ty:ty) => { num_impl!(IntFormat, format_d, $ty) } }
+macro_rules! ff{ ($ty:ty) => { num_impl!(FloatFormat, format_f, $ty) } }
 macro_rules! sf{ ($ty:ty) => { naive_impl!(StrFormat, format_s, $ty) } }
 
 df!{int}  df!{i8} df!{i16} df!{i32} df!{i64}

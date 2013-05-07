@@ -70,7 +70,7 @@ pub struct Parser<'self> {
 
 #[deriving(Eq)]
 enum State {
-    Position, Flags, Width, Precision, Specifier
+    Position, Flags, Width, Precision, NumArg, Specifier
 }
 
 static forbidden_chars : &'static [char] = &'static [
@@ -174,42 +174,62 @@ pub impl<'self> Parser<'self> {
 
         let mut width = None;
         let mut precision = None;
+        let mut position = option::None;
+        let mut num_arg = option::None;
 
-        let position = match self.parse_position() {
-            Ok(p) => p,
-            Err((msg, pos)) => return Error {msg:msg, pos:pos}
-        };
-
-        let flags = match self.parse_flags() {
+        let mut flags = match self.parse_flags(~[]) {
             Ok(f) => f,
-            Err((msg, pos)) => return Error { msg: msg, pos: pos}
+                Err((msg, pos)) => return Error { msg: msg, pos: pos}
         };
 
-        if self.state == Width {
-            width = match self.parse_field() {
-                Ok(w) => w,
-                Err((msg, pos)) => return Error { msg: msg, pos: pos}
-            };
-            if self.eat('.') {
-                self.state = Precision;
-            } else {
-                self.state = Specifier;
+        loop {
+            match self.state {
+                Width => if width == None {
+                    if precision != None {
+                        break;
+                    }
+                    width = match self.parse_field() {
+                        Ok(w) => w,
+                        Err((msg, pos)) => return Error { msg: msg, pos: pos}
+                    };
+                    if self.eat('.') {
+                        self.state = Precision;
+                        loop;
+                    }
+                },
+
+                Precision => if precision == None {
+                    precision = match self.parse_field() {
+                        Ok(p) => p,
+                        Err((msg, pos)) => return Error { msg: msg, pos: pos}
+                    };
+                    self.state = Specifier;
+                },
+
+                NumArg => if num_arg == option::None {
+                    num_arg = match self.parse_num_arg() {
+                        Ok(s) => s,
+                        Err((msg, pos)) => return Error { msg: msg, pos: pos}
+                    };
+                },
+
+                Position => if position == option::None {
+                    position = match self.parse_position() {
+                        Ok(p) => p,
+                        Err((msg, pos)) => return Error {msg:msg, pos:pos}
+                    };
+                },
+
+                _ => break
             }
-        }
 
-        if self.state == Precision {
-            precision = match self.parse_field() {
-                Ok(p) => p,
+            if self.pos == self.source.len() { break; }
+
+            flags = (match self.parse_flags(flags) {
+                Ok(f) => f,
                 Err((msg, pos)) => return Error { msg: msg, pos: pos}
-            };
-            self.state = Specifier;
+            });
         }
-
-        let num_arg = match self.parse_num_arg() {
-            Ok(s) => s,
-            Err((msg, pos)) => return Error { msg: msg, pos: pos}
-        };
-
         let spec = match self.pop_spec() {
             Ok(s) => s,
             Err((msg, pos)) => return Error { msg: msg, pos: pos}
@@ -224,6 +244,7 @@ pub impl<'self> Parser<'self> {
             special_flag: special_flag,
             num_arg: num_arg
         })
+
     }
 
     /**
@@ -294,8 +315,8 @@ pub impl<'self> Parser<'self> {
         }
     }
 
-    priv fn parse_flags(&mut self) -> Result<~[char], (~str, uint)> {
-        let mut flags = ~[];
+    priv fn parse_flags(&mut self, mut flags: ~[char]) -> Result<~[char], (~str, uint)> {
+        self.state = Flags;
         loop {
             match self.cur() {
                 '1'..'9' | '[' => {
@@ -305,6 +326,14 @@ pub impl<'self> Parser<'self> {
                 '.' => {
                     self.pop();
                     self.state = Precision;
+                    return Ok(flags);
+                }
+                '{' => {
+                    self.state = Position;
+                    return Ok(flags);
+                }
+                '<' => {
+                    self.state = NumArg;
                     return Ok(flags);
                 }
                 f if flags.contains(&f) => {
@@ -720,15 +749,36 @@ mod test {
         assert_eq!(~"There are 42 things with 22.5000 items reading Mary Poppins, %x", s);
     }
 
+    #[test]
+    fn parse_any_order() {
+        let mut parser = Parser::new("%<2>#{3} 20.5a", &test_desc);
+        let res = parser.next_item();
+
+        match res {
+            Place(holder) => {
+                assert_eq!(holder.specifier, 'a');
+                assert_eq!(holder.num_arg, Some(2));
+                assert_eq!(holder.position, Some(3));
+                assert_eq!(holder.width, Value(20));
+                assert_eq!(holder.precision, Value(5));
+                assert!(holder.flags.contains(&' '));
+                assert!(holder.flags.contains(&'#'));
+            }
+            a => fail!("Didn't get expected parse result. Expected Place(Holder), got %?", a)
+        }
+    }
+
     macro_rules! parse_fail (
         ($s:expr) => (
-            let _parser = Parser::new($s, &test_desc);
-            let res = _parser.next_item();
+            {
+                let mut parser = Parser::new($s, &test_desc);
+                let res = parser.next_item();
 
-            match res {
-                Error { _ } => (),
-                Place(holder) => fail!("Unexpected %?", holder),
-                a => fail!("Didn't get expected parse result. Expected Error, got %?", a)
+                match res {
+                    Error { _ } => (),
+                    Place(holder) => fail!("Unexpected %?", holder),
+                    a => fail!("Didn't get expected parse result. Expected Error, got %?", a)
+                }
             }
         )
     )
@@ -761,6 +811,21 @@ mod test {
     #[test]
     fn parse_fail_field() {
         parse_fail!("%[]a");
+    }
+
+    #[test]
+    fn parse_fail_order_repeat() {
+        parse_fail!("%<2> {1} a");
+    }
+
+    #[test]
+    fn parse_fail_order_spec() {
+        parse_fail!("%<2> {1}");
+    }
+
+    #[test]
+    fn parse_fail_repeat_field() {
+        parse_fail!("%!.12[10]b");
     }
 
     #[test]

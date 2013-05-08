@@ -33,7 +33,7 @@ pub mod simd;
 #[path = "unstable/extfmt.rs"]
 pub mod extfmt;
 #[path = "unstable/lang.rs"]
-#[cfg(notest)]
+#[cfg(not(test))]
 pub mod lang;
 
 mod rustrt {

@@ -28,6 +28,8 @@ pub mod finally;
 pub mod weak_task;
 #[path = "unstable/intrinsics.rs"]
 pub mod intrinsics;
+#[path = "unstable/simd.rs"]
+pub mod simd;
 #[path = "unstable/extfmt.rs"]
 pub mod extfmt;
 #[path = "unstable/lang.rs"]

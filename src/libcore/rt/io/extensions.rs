@@ -13,24 +13,69 @@
 // XXX: Not sure how this should be structured
 // XXX: Iteration should probably be considered seperately
 
+use vec;
+use rt::io::Reader;
+use option::{Option, Some, None};
+
 pub trait ReaderUtil {
+
+    /// Reads a single byte. Returns `None` on EOF.
+    ///
+    /// # Failure
+    ///
+    /// Raises the same conditions as the `read` method. Returns
+    /// `None` if the condition is handled.
+    fn read_byte(&mut self) -> Option<u8>;
 
     /// Reads `len` bytes and gives you back a new vector
     ///
     /// # Failure
     ///
-    /// Raises the `io_error` condition on error. Returns an empty
-    /// vector if the condition is handled.
+    /// Raises the same conditions as the `read` method. May return
+    /// less than the requested number of bytes on error or EOF.
     fn read_bytes(&mut self, len: uint) -> ~[u8];
 
     /// Reads all remaining bytes from the stream.
     ///
     /// # Failure
     ///
-    /// Raises the `io_error` condition on error. Returns an empty
-    /// vector if the condition is handled.
+    /// Raises the same conditions as the `read` method.
     fn read_to_end(&mut self) -> ~[u8];
 
+}
+
+impl<T: Reader> ReaderUtil for T {
+    fn read_byte(&mut self) -> Option<u8> {
+        let mut buf = [0];
+        match self.read(buf) {
+            Some(nread) if nread == 0 => {
+                debug!("read 0 bytes. trying again");
+                self.read_byte()
+            }
+            Some(nread) => Some(buf[0]),
+            None => None
+        }
+    }
+
+    fn read_bytes(&mut self, len: uint) -> ~[u8] {
+        // XXX Don't initialize vector elements
+        let mut buf = vec::from_elem(len, 0);
+        let mut total_read = 0;
+        while total_read < len {
+            let slice = vec::mut_slice(buf, total_read, buf.len());
+            match self.read(slice) {
+                Some(nread) => {
+                    total_read += nread;
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        return buf;
+    }
+
+    fn read_to_end(&mut self) -> ~[u8] { fail!() }
 }
 
 pub trait ReaderByteConversions {
@@ -466,4 +511,92 @@ pub trait WriterByteConversions {
     ///
     /// Raises the `io_error` condition on error.
     fn write_i8(&mut self, n: i8);
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use option::{Some, None};
+    use cell::Cell;
+    use rt::io::mem::MemReader;
+    use rt::io::mock::*;
+    use rt::io::{io_error, placeholder_error};
+
+    #[test]
+    fn read_byte() {
+        let mut reader = MemReader::new(~[10]);
+        let byte = reader.read_byte();
+        assert!(byte == Some(10));
+    }
+
+    #[test]
+    fn read_byte_0_bytes() {
+        let mut reader = MockReader::new();
+        let count = Cell(0);
+        reader.read = |buf| {
+            do count.with_mut_ref |count| {
+                if *count == 0 {
+                    *count = 1;
+                    Some(0)
+                } else {
+                    buf[0] = 10;
+                    Some(1)
+                }
+            }
+        };
+        let byte = reader.read_byte();
+        assert!(byte == Some(10));
+    }
+
+    #[test]
+    fn read_byte_eof() {
+        let mut reader = MockReader::new();
+        reader.read = |_| None;
+        let byte = reader.read_byte();
+        assert!(byte == None);
+    }
+
+    #[test]
+    fn read_byte_error() {
+        let mut reader = MockReader::new();
+        reader.read = |_| {
+            io_error::cond.raise(placeholder_error());
+            None
+        };
+        do io_error::cond.trap(|_| {
+        }).in {
+            let byte = reader.read_byte();
+            assert!(byte == None);
+        }
+    }
+
+    #[test]
+    fn read_bytes() {
+        let mut reader = MemReader::new(~[10, 11, 12, 13]);
+        let bytes = reader.read_bytes(4);
+        assert!(bytes == ~[10, 11, 12, 13]);
+    }
+
+    #[test]
+    fn read_bytes_partial() {
+        let mut reader = MockReader::new();
+        let count = Cell(0);
+        reader.read = |buf| {
+            do count.with_mut_ref |count| {
+                if *count == 0 {
+                    *count = 1;
+                    buf[0] = 10;
+                    buf[1] = 11;
+                    Some(2)
+                } else {
+                    buf[0] = 12;
+                    buf[1] = 13;
+                    Some(2)
+                }
+            }
+        };
+        let bytes = reader.read_bytes(4);
+        assert!(bytes == ~[10, 11, 12, 13]);
+    }
+
 }

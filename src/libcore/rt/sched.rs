@@ -12,7 +12,7 @@ use option::*;
 use sys;
 use cast::transmute;
 
-use super::work_queue::WorkQueue;
+use super::work_queue::*;
 use super::stack::{StackPool, StackSegment};
 use super::rtio::{EventLoop, EventLoopObject};
 use super::context::Context;
@@ -31,7 +31,11 @@ pub mod local_sched;
 /// thread local storage and the running task is owned by the
 /// scheduler.
 pub struct Scheduler {
+<<<<<<< HEAD:src/libcore/rt/sched.rs
     priv task_queue: WorkQueue<~Task>,
+=======
+    task_queue: WorkQueue<Task>,
+>>>>>>> Implement work-stealing deque for task queue:src/libcore/rt/sched/mod.rs
     stack_pool: StackPool,
     /// The event loop used to drive the scheduler and perform I/O
     event_loop: ~EventLoopObject,
@@ -133,6 +137,7 @@ pub impl Scheduler {
         rtdebug!("looking in work queue for task to schedule");
 
         let mut self = self;
+<<<<<<< HEAD:src/libcore/rt/sched.rs
         match self.task_queue.pop_front() {
             Some(task) => {
                 rtdebug!("resuming task from work queue");
@@ -141,6 +146,20 @@ pub impl Scheduler {
             None => {
                 rtdebug!("no tasks in queue");
                 local_sched::put(self);
+=======
+        loop {
+            match self.task_queue.steal() {
+                Have(task) => {
+                    self.resume_task_immediately(task);
+                    return true;
+                }
+                Empty => {
+                    rtdebug!("no tasks in queue");
+                    local_sched::put(self);
+                    return false;
+                }
+                Abort => loop
+>>>>>>> Implement work-stealing deque for task queue:src/libcore/rt/sched/mod.rs
             }
         }
     }
@@ -170,7 +189,11 @@ pub impl Scheduler {
         do self.switch_running_tasks_and_then(task) |last_task| {
             let last_task = Cell(last_task);
             do local_sched::borrow |sched| {
+<<<<<<< HEAD:src/libcore/rt/sched.rs
                 sched.enqueue_task(last_task.take());
+=======
+                sched.task_queue.push(last_task.take());
+>>>>>>> Implement work-stealing deque for task queue:src/libcore/rt/sched/mod.rs
             }
         }
     }
@@ -397,6 +420,7 @@ pub impl Task {
     }
 }
 
+<<<<<<< HEAD:src/libcore/rt/sched.rs
 #[cfg(test)]
 mod test {
     use int;
@@ -421,6 +445,21 @@ mod test {
             sched.run();
             assert!(task_ran);
         }
+=======
+#[test]
+fn test_simple_scheduling() {
+    do run_in_bare_thread {
+        let mut task_ran = false;
+        let task_ran_ptr: *mut bool = &mut task_ran;
+
+        let mut sched = ~UvEventLoop::new_scheduler();
+        let task = ~do Task::new(&mut sched.stack_pool) {
+            unsafe { *task_ran_ptr = true; }
+        };
+        sched.task_queue.push(task);
+        sched.run();
+        assert!(task_ran);
+>>>>>>> Implement work-stealing deque for task queue:src/libcore/rt/sched/mod.rs
     }
 
     #[test]
@@ -430,6 +469,7 @@ mod test {
             let mut task_count = 0;
             let task_count_ptr: *mut int = &mut task_count;
 
+<<<<<<< HEAD:src/libcore/rt/sched.rs
             let mut sched = ~UvEventLoop::new_scheduler();
             for int::range(0, total) |_| {
                 let task = ~do Task::new(&mut sched.stack_pool) {
@@ -439,6 +479,14 @@ mod test {
             }
             sched.run();
             assert!(task_count == total);
+=======
+        let mut sched = ~UvEventLoop::new_scheduler();
+        for int::range(0, total) |_| {
+            let task = ~do Task::new(&mut sched.stack_pool) {
+                unsafe { *task_count_ptr = *task_count_ptr + 1; }
+            };
+            sched.task_queue.push(task);
+>>>>>>> Implement work-stealing deque for task queue:src/libcore/rt/sched/mod.rs
         }
     }
 
@@ -451,6 +499,7 @@ mod test {
             let mut sched = ~UvEventLoop::new_scheduler();
             let task1 = ~do Task::new(&mut sched.stack_pool) {
                 unsafe { *count_ptr = *count_ptr + 1; }
+<<<<<<< HEAD:src/libcore/rt/sched.rs
                 let mut sched = local_sched::take();
                 let task2 = ~do Task::new(&mut sched.stack_pool) {
                     unsafe { *count_ptr = *count_ptr + 1; }
@@ -468,6 +517,21 @@ mod test {
             sched.run();
             assert!(count == 3);
         }
+=======
+            };
+            // Context switch directly to the new task
+            do sched.switch_running_tasks_and_then(task2) |task1| {
+                let task1 = Cell(task1);
+                do local_sched::borrow |sched| {
+                    sched.task_queue.push(task1.take());
+                }
+            }
+            unsafe { *count_ptr = *count_ptr + 1; }
+        };
+        sched.task_queue.push(task1);
+        sched.run();
+        assert!(count == 3);
+>>>>>>> Implement work-stealing deque for task queue:src/libcore/rt/sched/mod.rs
     }
 
     #[bench] #[test] #[ignore(reason = "long test")]
@@ -479,11 +543,19 @@ mod test {
 
             let mut sched = ~UvEventLoop::new_scheduler();
 
+<<<<<<< HEAD:src/libcore/rt/sched.rs
             let start_task = ~do Task::new(&mut sched.stack_pool) {
                 run_task(count_ptr);
             };
             sched.enqueue_task(start_task);
             sched.run();
+=======
+        let start_task = ~do Task::new(&mut sched.stack_pool) {
+            run_task(count_ptr);
+        };
+        sched.task_queue.push(start_task);
+        sched.run();
+>>>>>>> Implement work-stealing deque for task queue:src/libcore/rt/sched/mod.rs
 
             assert!(count == MAX);
 
@@ -516,13 +588,21 @@ mod test {
                         assert!(!sched.in_task_context());
                         sched.enqueue_task(task.take());
                     }
+<<<<<<< HEAD:src/libcore/rt/sched.rs
                 }
             };
             sched.enqueue_task(task);
             sched.run();
         }
+=======
+                };
+                sched.task_queue.push(task);
+            }
+        };
+>>>>>>> Implement work-stealing deque for task queue:src/libcore/rt/sched/mod.rs
     }
 
+<<<<<<< HEAD:src/libcore/rt/sched.rs
     #[test]
     fn test_io_callback() {
         // This is a regression test that when there are no schedulable tasks
@@ -545,5 +625,24 @@ mod test {
                 }
             }
         }
+=======
+#[test]
+fn test_block_task() {
+    do run_in_bare_thread {
+        let mut sched = ~UvEventLoop::new_scheduler();
+        let task = ~do Task::new(&mut sched.stack_pool) {
+            let sched = local_sched::take();
+            assert!(sched.in_task_context());
+            do sched.deschedule_running_task_and_then() |task| {
+                let task = Cell(task);
+                do local_sched::borrow |sched| {
+                    assert!(!sched.in_task_context());
+                    sched.task_queue.push(task.take());
+                }
+            }
+        };
+        sched.task_queue.push(task);
+        sched.run();
+>>>>>>> Implement work-stealing deque for task queue:src/libcore/rt/sched/mod.rs
     }
 }

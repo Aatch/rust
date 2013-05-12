@@ -28,7 +28,11 @@ pub fn run_in_newsched_task(f: ~fn()) {
         let task = ~Task::with_local(&mut sched.stack_pool,
                                      LocalServices::without_unwinding(),
                                      f.take());
+<<<<<<< HEAD
         sched.enqueue_task(task);
+=======
+        sched.task_queue.push(task);
+>>>>>>> Implement work-stealing deque for task queue
         sched.run();
     }
 }
@@ -59,7 +63,11 @@ pub fn spawntask_immediately(f: ~fn()) {
     do sched.switch_running_tasks_and_then(task) |task| {
         let task = Cell(task);
         do local_sched::borrow |sched| {
+<<<<<<< HEAD
             sched.enqueue_task(task.take());
+=======
+            sched.task_queue.push(task.take());
+>>>>>>> Implement work-stealing deque for task queue
         }
     }
 }
@@ -131,7 +139,11 @@ pub fn spawntask_try(f: ~fn()) -> Result<(), ()> {
                 do sched.switch_running_tasks_and_then(old_task.take()) |new_task| {
                     let new_task = Cell(new_task);
                     do local_sched::borrow |sched| {
+<<<<<<< HEAD
                         sched.enqueue_task(new_task.take());
+=======
+                        sched.task_queue.push(new_task.take());
+>>>>>>> Implement work-stealing deque for task queue
                     }
                 }
             }

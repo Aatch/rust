@@ -83,6 +83,12 @@ pub mod uv;
 pub mod local;
 
 /// A parallel work-stealing deque.
+#[cfg(wq_lock_free)]
+#[path="work_queue.rs"]
+mod work_queue;
+
+#[cfg(not(wq_lock_free))]
+#[path="wq_locked.rs"]
 mod work_queue;
 
 /// A parallel queue.

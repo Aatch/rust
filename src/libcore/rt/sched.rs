@@ -13,7 +13,7 @@ use sys;
 use cast::transmute;
 use cell::Cell;
 
-use super::work_queue::WorkQueue;
+use super::work_queue::*;
 use super::stack::{StackPool, StackSegment};
 use super::rtio::{EventLoop, EventLoopObject, RemoteCallbackObject};
 use super::context::Context;
@@ -27,7 +27,7 @@ use rt::rtio::IoFactoryObject;
 /// thread local storage and the running task is owned by the
 /// scheduler.
 pub struct Scheduler {
-    priv work_queue: WorkQueue<~Coroutine>,
+    priv work_queue: WorkQueue<Coroutine>,
     stack_pool: StackPool,
     /// The event loop used to drive the scheduler and perform I/O
     event_loop: ~EventLoopObject,
@@ -140,14 +140,19 @@ pub impl Scheduler {
         rtdebug!("looking in work queue for task to schedule");
 
         let mut this = self;
-        match this.work_queue.pop() {
-            Some(task) => {
-                rtdebug!("resuming task from work queue");
-                this.resume_task_immediately(task);
-            }
-            None => {
-                rtdebug!("no tasks in queue");
-                Local::put(this);
+        loop {
+            match this.work_queue.pop() {
+                Have(task) => {
+                    rtdebug!("resuming task from work queue");
+                    this.resume_task_immediately(task);
+                    return;
+                }
+                Empty => {
+                    rtdebug!("no tasks in queue");
+                    Local::put(this);
+                    return;
+                }
+                Abort => loop // Lost a race, try again
             }
         }
     }

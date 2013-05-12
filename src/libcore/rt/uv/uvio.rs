@@ -403,11 +403,7 @@ fn test_read_and_block() {
                 do scheduler.deschedule_running_task_and_then |task| {
                     let task = Cell(task);
                     do local_sched::borrow |scheduler| {
-<<<<<<< HEAD:src/libcore/rt/uv/uvio.rs
                         scheduler.enqueue_task(task.take());
-=======
-                        scheduler.task_queue.push(task.take());
->>>>>>> Implement work-stealing deque for task queue:src/libcore/rt/uvio.rs
                     }
                 }
             }

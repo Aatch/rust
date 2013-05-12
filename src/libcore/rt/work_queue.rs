@@ -132,6 +132,10 @@ pub impl<T> WorkQueue<T> {
         }
     }
 
+    fn is_empty(&self) -> bool {
+        (self.top - self.bottom) <= 0
+    }
+
     priv fn cas_top(&mut self, old:uint, new:uint) -> bool {
         let old = old as int;
         let new = new as int;
@@ -381,9 +385,5 @@ mod test {
         do b.iter {
             q.pop();
         }
-    }
-
-    fn is_empty(&self) -> bool {
-        return self.queue.is_empty();
     }
 }

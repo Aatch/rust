@@ -145,26 +145,7 @@ pub fn start(_argc: int, _argv: **u8, crate_map: *u8, main: ~fn()) -> int {
     let mut sched = ~Scheduler::new(loop_);
     let main_task = ~Task::new(&mut sched.stack_pool, main);
 
-<<<<<<< HEAD
     sched.enqueue_task(main_task);
-=======
-    let main_task = ~do Task::new(&mut sched.stack_pool) {
-
-        unsafe {
-            // `main` is an `fn() -> ()` that doesn't take an environment
-            // XXX: Could also call this as an `extern "Rust" fn` once they work
-            let main = Closure {
-                code: main as *(),
-                env: ptr::null(),
-            };
-            let mainfn: &fn() = cast::transmute(main);
-
-            mainfn();
-        }
-    };
-
-    sched.task_queue.push(main_task);
->>>>>>> Implement work-stealing deque for task queue
     sched.run();
 
     return 0;
@@ -242,19 +223,11 @@ fn test_context() {
                 assert!(context() == SchedulerContext);
                 let task = Cell(task);
                 do local_sched::borrow |sched| {
-<<<<<<< HEAD
                     sched.enqueue_task(task.take());
                 }
             }
         };
         sched.enqueue_task(task);
-=======
-                    sched.task_queue.push(task.take());
-                }
-            }
-        };
-        sched.task_queue.push(task);
->>>>>>> Implement work-stealing deque for task queue
         sched.run();
     }
 }

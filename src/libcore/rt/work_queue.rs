@@ -1,5 +1,15 @@
+// Copyright 2013 The Rust Project Developers. See the COPYRIGHT
+// file at the top-level directory of this distribution and at
+// http://rust-lang.org/COPYRIGHT.
+//
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+
 use unstable::intrinsics::{init, atomic_cxchg, atomic_xchg};
-use u64;
+use uint;
 use cast;
 use vec;
 use ptr;
@@ -20,12 +30,12 @@ use ptr;
  */
 
 /*
- * TODO: Use a better memory-management scheme, copying as we are now is not optimal.
+ * NOTE: Use a better memory-management scheme, copying as we are now is not optimal.
  */
 
 pub struct WorkQueue<T> {
-    priv top : u64,
-    priv bottom : u64,
+    priv top : uint,
+    priv bottom : uint,
     priv active_buffer: WorkBuffer<T>
 }
 
@@ -63,7 +73,7 @@ pub impl<T> WorkQueue<T> {
         let b = self.bottom;
         let t = self.top;
 
-        let size = (b - t) as uint;
+        let size = (b - t);
         if size >= self.active_buffer.len()-1 {
             self.active_buffer = self.active_buffer.grow(b,t);
         }
@@ -74,28 +84,21 @@ pub impl<T> WorkQueue<T> {
 
     fn pop(&mut self) -> QueueResult<~T> {
         let b = self.bottom - 1;
-        let t, o, size;
 
-        { // scoping because borrowck
-            {
-                let buf = &mut self.active_buffer;
+        self.bottom = b;
+        let t = self.top;
+        let size = (b - t) as int;
+        if size < 0 {
+            self.bottom = t;
+            return Empty;
+        }
 
-                self.bottom = b;
-                t = self.top;
-                size = (b - t) as int;
-                if size < 0 {
-                    self.bottom = t;
-                    return Empty;
-                }
+        let o = self.active_buffer.take(b);
 
-                o = buf.take(b);
-
-            }
-            if size > 0 {
-                self.try_shrink(b, t);
-                return Have(o);
-            }
-        };
+        if size > 0 {
+            self.try_shrink(b, t);
+            return Have(o);
+        }
 
         let val = if !self.cas_top(t, t+1) {
             Empty
@@ -129,7 +132,7 @@ pub impl<T> WorkQueue<T> {
         }
     }
 
-    priv fn cas_top(&mut self, old:u64, new:u64) -> bool {
+    priv fn cas_top(&mut self, old:uint, new:uint) -> bool {
         let old = old as int;
         let new = new as int;
         unsafe {
@@ -137,8 +140,8 @@ pub impl<T> WorkQueue<T> {
         }
     }
 
-    priv fn try_shrink(&mut self, bot:u64, top:u64) {
-        let size = (bot - top) as uint;
+    priv fn try_shrink(&mut self, bot:uint, top:uint) {
+        let size = (bot - top);
         if size < (self.active_buffer.len()/3) { // 3 is the K from the paper, K <= 3
             self.active_buffer = self.active_buffer.shrink(bot, top);
         }
@@ -158,7 +161,7 @@ pub impl<T> WorkBuffer<T> {
      * Takes the element from the buffer. This is unsafe
      * because there may not be a valid element at the location.
      */
-    unsafe fn take(&mut self, idx:u64) -> ~T {
+    unsafe fn take(&mut self, idx:uint) -> ~T {
         let i = self.wrap(idx);
         // This effectively pretends that we are just
         // moving a value from some location, not moving
@@ -169,7 +172,7 @@ pub impl<T> WorkBuffer<T> {
         }
     }
 
-    unsafe fn put(&mut self, idx:u64, t:~T) {
+    unsafe fn put(&mut self, idx:uint, t:~T) {
         let i = self.wrap(idx);
         self.buf.unsafe_set(i, t);
     }
@@ -178,29 +181,29 @@ pub impl<T> WorkBuffer<T> {
         self.buf.len()
     }
 
-    fn grow(&mut self, bot:u64, top:u64) -> WorkBuffer<T> {
-        debug!("Growing Buffer: %u -> %u", top as uint, bot as uint);
+    fn grow(&mut self, bot:uint, top:uint) -> WorkBuffer<T> {
+        debug!("Growing Buffer: %u -> %u", top, bot);
         let mut buf = WorkBuffer::new(self.len() << 1);
-        for u64::range(top, bot) |i| {
+        for uint::range(top, bot) |i| {
             buf.put(i, self.take(i));
         }
 
         buf
     }
 
-    fn shrink(&mut self, bot:u64, top:u64) -> WorkBuffer<T> {
-        debug!("Shrinking Buffer: %u -> %u", top as uint, bot as uint);
+    fn shrink(&mut self, bot:uint, top:uint) -> WorkBuffer<T> {
+        debug!("Shrinking Buffer: %u -> %u", top, bot);
         let mut buf = WorkBuffer::new(self.len() >> 1);
-        for u64::range(top, bot) |i| {
+        for uint::range(top, bot) |i| {
             buf.put(i, self.take(i));
         }
 
         buf
     }
 
-    priv fn wrap(&self, i:u64) -> uint {
-        let l = self.len() as u64;
-        (i & (l-1)) as uint
+    priv fn wrap(&self, i:uint) -> uint {
+        let l = self.len();
+        (i & (l-1))
     }
 }
 
@@ -209,7 +212,7 @@ mod test {
     extern mod std;
 
     use super::*;
-    use u64;
+    use uint;
     use comm;
     use comm::*;
     use task;
@@ -258,11 +261,11 @@ mod test {
     fn work_queue_grow() {
         let mut q = WorkQueue::new();
 
-        for u64::range(0, 72) |i| {
+        for uint::range(0, 72) |i| {
             q.push(~i);
         }
 
-        for u64::range_rev(72,0) |i| {
+        for uint::range_rev(72,0) |i| {
             assert_eq!(q.pop(), Have(~(i-1)));
         }
 
@@ -274,11 +277,11 @@ mod test {
     fn work_queue_steal() {
         let mut q = WorkQueue::new();
 
-        for u64::range(0, 72) |i| {
+        for uint::range(0, 72) |i| {
             q.push(~i);
         }
 
-        for u64::range(0, 72) |i| {
+        for uint::range(0, 72) |i| {
             assert_eq!(q.steal(), Have(~i));
         }
 
@@ -298,12 +301,12 @@ mod test {
         use cast;
         let mut q = ~WorkQueue::new();
 
-        for u64::range(1,256) |i| {
+        for uint::range(1,256) |i| {
             q.push(~i);
         }
 
         //Magic pointer casting so we can pass it to other tasks
-        let ptr : *u8 = unsafe { cast::transmute::<&WorkQueue<u64>, *u8>(q) };
+        let ptr : *u8 = unsafe { cast::transmute::<&WorkQueue<uint>, *u8>(q) };
 
         let mut chans = ~[];
 
@@ -317,7 +320,7 @@ mod test {
                 port.recv(); //Sync so it doesn't just immediately stop because there aren't any
                              // objects in the queue
                 unsafe { do task::atomically {
-                    let q  = cast::transmute::<*u8, &mut WorkQueue<u64>>(ptr);
+                    let q  = cast::transmute::<*u8, &mut WorkQueue<uint>>(ptr);
 
                     let mut prev = 0;
 
@@ -342,7 +345,7 @@ mod test {
 
         for chans.each |c| { c.send(()); }
 
-        for u64::range(0, (1u64 << 16)) |i| {
+        for uint::range(0, (1u << 16)) |i| {
             q.push(~(i+256));
         }
 
@@ -365,7 +368,7 @@ mod test {
     fn bench_queue_push(b: &mut std::test::BenchHarness) {
         let mut q = ~WorkQueue::new();
         do b.iter {
-            q.push(~1u64);
+            q.push(~1u);
         }
     }
 
@@ -373,7 +376,7 @@ mod test {
     fn bench_queue_pop(b: &mut std::test::BenchHarness) {
         let mut q = ~WorkQueue::new();
         for (1 << 10).times {
-            q.push(~1u64);
+            q.push(~1u);
         }
         do b.iter {
             q.pop();

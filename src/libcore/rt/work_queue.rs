@@ -48,7 +48,7 @@ fn atomic_load(src: &mut int) -> int {
     (*src)
 }
 
-//XXX: This should be replaced by proper atomic type
+//FIXME: #5042 This should be replaced by proper atomic type
 struct AtomicUint(uint);
 impl AtomicUint {
     fn load(&self) -> uint {
@@ -126,25 +126,26 @@ pub impl<T:Owned> WorkQueue<T> {
 
     #[cfg(not(stage0))]
     fn push(&mut self, o:~T) {
-        let b = self.bottom.load();
-        let t = self.top.load();
+        unsafe {
+            let b = self.bottom.load();
+            let t = self.top.load();
 
-        let mut buf_ref = unsafe {(*self.active_buffer).clone()};
-        let mut buf = unsafe {unpack_buffer(&buf_ref)};
+            let buf_ref = (*self.active_buffer).clone();
+            let mut buf = buf_ref.get();
 
-        let new_buf;
-        let size = (b - t);
-        if size >= buf.len()-1 {
-            unsafe {
-                let b = buf.grow(b,t);
+            let new_buf;
+            let size = (b - t);
+            if size >= (&*buf).len()-1 {
+                let b = (&mut *buf).grow(b,t);
                 new_buf = ~UnsafeAtomicRcBox::new(b);
-                store_buffer(&mut self.active_buffer, &new_buf);
-                buf = unpack_buffer(new_buf);
+                self.active_buffer = new_buf.clone();
+                buf = new_buf.get();
             }
-        }
 
-        buf.put(b, o);
-        self.bottom.store(b+1);
+            rtdebug!("Pushed %? to %?", o, b);
+            (&mut *buf).put(b, o);
+            self.bottom.store(b+1);
+        }
     }
 
     #[cfg(stage0)]
@@ -154,8 +155,10 @@ pub impl<T:Owned> WorkQueue<T> {
     fn pop(&mut self) -> QueueResult<~T> {
         let b = self.bottom.load() - 1;
 
-        let mut buf_ref = unsafe {(*self.active_buffer).clone()};
-        let mut buf = unsafe {unpack_buffer(&buf_ref)};
+        let buf_ref = (*self.active_buffer).clone();
+        let buf = unsafe {unpack_buffer(&buf_ref)};
+
+        rtdebug!("Top: %? Bottom: %?", self.top.load(), b);
 
         self.bottom.store(b);
 
@@ -163,10 +166,12 @@ pub impl<T:Owned> WorkQueue<T> {
         let size = (b - t) as int;
         if size < 0 {
             self.bottom.store(t);
+            rtdebug!("Empty! Now %?", self.bottom.load());
             return Empty;
         }
 
         let o = buf.take(b);
+        rtdebug!("Took %?", o);
 
         if size > 0 {
             self.try_shrink(b, t);
@@ -193,7 +198,7 @@ pub impl<T:Owned> WorkQueue<T> {
         let b = self.bottom.load();
 
         let buf_ref;
-        let mut buf;
+        let buf;
 
         unsafe {
             buf_ref = (*self.active_buffer).clone();
@@ -234,14 +239,12 @@ pub impl<T:Owned> WorkQueue<T> {
 
         unsafe {
             let buf_ref = (*self.active_buffer).clone();
-            let mut buf = unpack_buffer(&buf_ref);
+            let buf = buf_ref.get();
 
-            if size < (buf.len()/3) { // 3 is the K from the paper, K <= 3
-                let b = buf.shrink(bot,top);
+            if size < ((&*buf).len()/3) { // 3 is the K from the paper, K <= 3
+                let b = (*buf).shrink(bot,top);
                 let new_buf = ~UnsafeAtomicRcBox::new(b);
-                unsafe {
-                    store_buffer(&mut self.active_buffer, &new_buf);
-                }
+                self.active_buffer = new_buf;
             }
         }
     }
@@ -281,7 +284,7 @@ pub impl<T> WorkBuffer<T> {
     }
 
     fn grow(&mut self, bot:uint, top:uint) -> WorkBuffer<T> {
-        debug!("Growing Buffer: %u -> %u", top, bot);
+        rtdebug!("Growing Buffer: %u -> %u", top, bot);
         let mut buf = WorkBuffer::new(self.len() << 1);
         for uint::range(top, bot) |i| {
             buf.put(i, self.take(i));
@@ -291,7 +294,7 @@ pub impl<T> WorkBuffer<T> {
     }
 
     fn shrink(&mut self, bot:uint, top:uint) -> WorkBuffer<T> {
-        debug!("Shrinking Buffer: %u -> %u", top, bot);
+        rtdebug!("Shrinking Buffer: %u -> %u", top, bot);
         let mut buf = WorkBuffer::new(self.len() >> 1);
         for uint::range(top, bot) |i| {
             buf.put(i, self.take(i));
@@ -318,6 +321,7 @@ mod test {
     use libc;
     use iter::*;
     use old_iter::*;
+    use vec::*;
 
     #[test]
     fn workbuf() {
@@ -392,7 +396,65 @@ mod test {
 
     #[test]
     fn work_queue_concurrent() {
+        use rt::thread::Thread;
+        use unstable::sync::UnsafeAtomicRcBox;
+        use cell::Cell;
 
+        let wq = WorkQueue::new();
+
+        let qbox = UnsafeAtomicRcBox::new(wq);
+
+        // Sync var
+        let mut sync = true;
+        let sync_p : *mut bool = &mut sync;
+
+        let mut threads : ~[Thread] = ~[];
+
+        for 8.times {
+            let my_box = Cell(qbox.clone());
+            let t = do Thread::start {
+                unsafe {
+                    let my_box = my_box.take();
+                    let wq = my_box.get();
+
+                    while (*sync_p) { }
+
+                    loop {
+                        let stole = (&mut *wq).steal();
+                        match stole {
+                            Empty => break,
+                            _ => ()
+                        }
+                    }
+                }
+            };
+            threads.push(t);
+        }
+
+        let wq = qbox.get();
+
+        for uint::range(0, 512) |i| {
+            unsafe {
+                (*wq).push(~i);
+            }
+        }
+
+        unsafe {
+            (*sync_p) = false;
+        }
+
+
+        for uint::range(512, (1 << 16)) |i| {
+            unsafe {
+                (*wq).push(~i);
+            }
+        }
+
+        let _ = threads;
+
+        unsafe {
+            assert!((*wq).is_empty());
+        }
     }
 
     #[bench]

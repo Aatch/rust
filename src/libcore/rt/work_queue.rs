@@ -277,6 +277,7 @@ mod test {
     use uint;
     use iter::*;
     use vec::*;
+    use libc;
 
     #[test]
     fn workbuf() {
@@ -417,9 +418,77 @@ mod test {
             assert!((*wq).is_empty());
         }
 
-        extern "C" {
-            fn usleep(us:uint) -> int;
+    }
+
+    #[test]
+    fn work_queue_concurrent_pop() {
+        use rt::thread::Thread;
+        use rt::test;
+        use unstable::sync::UnsafeAtomicRcBox;
+        use cell::Cell;
+
+        static NUM_ITEMS : uint = (1 << 16);
+        static NUM_THREADS : uint = 8;
+
+        // Box the queue to share it between threads
+        let wq = WorkQueue::new::<uint>();
+        let qbox = UnsafeAtomicRcBox::new(wq);
+
+        let mut threads : ~[Thread] = ~[];
+
+        // Populate the queue
+        let wq = qbox.get();
+        for uint::range(1, NUM_ITEMS) |i| {
+            unsafe {
+                (*wq).push(~i);
+            }
         }
+
+        // Start the threads a-stealin'
+        for NUM_THREADS.times {
+            let my_box = Cell(qbox.clone());
+            let t = do test::spawntask_thread {
+                unsafe {
+                    let my_box = my_box.take();
+                    let wq = my_box.get();
+
+                    let mut prev : uint = 0;
+
+                    loop {
+                        let stole = (&mut *wq).steal();
+                        match stole {
+                            Empty => break,
+                            Have(i) => {
+                                assert!(*i > prev);
+                                prev = *i;
+                                // Pretend to do work. This is ok, because
+                                // we know this is the only task in the thread
+                                unsafe { usleep(1000); }
+                            }
+                            Abort => ()
+                        }
+                    }
+                }
+            };
+            threads.push(t);
+        }
+
+        loop {
+            let popped = unsafe {(&mut *wq).pop()};
+            match popped {
+                Empty => break,
+                Have(_) => {
+                    unsafe { usleep(500); }
+                }
+                Abort => ()
+            }
+        }
+        let _ = threads;
+
+        unsafe {
+            assert!((*wq).is_empty());
+        }
+
     }
 
     #[bench]
@@ -439,5 +508,9 @@ mod test {
         do b.iter {
             q.pop();
         }
+    }
+
+    extern "C" {
+        fn usleep(us:libc::c_uint) -> libc::c_int;
     }
 }

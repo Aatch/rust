@@ -18,6 +18,7 @@ use cast;
 use vec;
 use ptr;
 use kinds::Owned;
+use unstable::sync::AtomicUint;
 
 /**
  * Implementation of the Chase & Lev Work-Stealing deque.
@@ -35,58 +36,9 @@ use kinds::Owned;
  */
 
 /*
- * NOTE: Use a better memory-management scheme, copying as we are now is not optimal.
+ * NOTE: Use a better memory-management scheme, copying as we are now is not optimal, though the
+ * fact that it is just a pointer copy does lessen the impact somewhat.
  */
-
-#[cfg(stage0)]
-fn atomic_store(dst: &mut int, val:int) {
-    (*dst) = val;
-}
-
-#[cfg(stage0)]
-fn atomic_load(src: &mut int) -> int {
-    (*src)
-}
-
-//FIXME: #5042 This should be replaced by proper atomic type
-struct AtomicUint(uint);
-impl AtomicUint {
-    fn load(&self) -> uint {
-        unsafe {
-            atomic_load(cast::transmute(self)) as uint
-        }
-    }
-
-    fn store(&mut self, val:uint) {
-        unsafe {
-            atomic_store(cast::transmute(self), val as int);
-        }
-    }
-
-    fn add(&mut self, val:int) -> uint {
-        unsafe {
-            atomic_xadd(cast::transmute(self), val as int) as uint
-        }
-    }
-
-    fn cas(&self, old:uint, new:uint) -> uint {
-        unsafe {
-            atomic_cxchg(cast::transmute(self), old as int, new as int) as uint
-        }
-    }
-}
-
-unsafe fn unpack_buffer<'a, T:Owned>(box: &'a UnsafeAtomicRcBox<WorkBuffer<T>>) -> &'a mut WorkBuffer<T> {
-    let b = box.get();
-    cast::transmute(b)
-}
-
-unsafe fn store_buffer<T:Owned>(orig : &mut ~UnsafeAtomicRcBox<WorkBuffer<T>>,
-                          new: &~UnsafeAtomicRcBox<WorkBuffer<T>>) {
-    let orig_ptr : &mut &mut int = cast::transmute(orig);
-    let new_ptr : &int = cast::transmute(new);
-    atomic_store(*orig_ptr, *new_ptr);
-}
 
 pub struct WorkQueue<T> {
     priv top : AtomicUint,
@@ -114,6 +66,12 @@ fn owned_ptr_val<T>(a : &~T) -> uint {
     }
 }
 
+/// Helper to unpack the buffer and make it a borrowed pointer
+unsafe fn unpack_buffer<'a, T:Owned>(box: &'a UnsafeAtomicRcBox<WorkBuffer<T>>) -> &'a mut WorkBuffer<T> {
+    let b = box.get();
+    cast::transmute(b)
+}
+
 pub impl<T:Owned> WorkQueue<T> {
     fn new() -> WorkQueue<T> {
         static INIT_QUEUE_SIZE : uint = 64;
@@ -124,7 +82,6 @@ pub impl<T:Owned> WorkQueue<T> {
         }
     }
 
-    #[cfg(not(stage0))]
     fn push(&mut self, o:~T) {
         unsafe {
             let b = self.bottom.load();
@@ -142,26 +99,17 @@ pub impl<T:Owned> WorkQueue<T> {
                 buf = new_buf.get();
             }
 
-            rtdebug!("Pushed %? to %?", o, b);
+            rtdebug!("WorkQueue::push: pushed element");
             (&mut *buf).put(b, o);
             self.bottom.store(b+1);
         }
-
-        buf.put(b, o);
-        self.bottom.store(b+1);
     }
 
-    #[cfg(stage0)]
-    fn push(&mut self, _o:~T) { }
-
-    #[cfg(not(stage0))]
     fn pop(&mut self) -> QueueResult<~T> {
         let b = self.bottom.load() - 1;
 
         let buf_ref = (*self.active_buffer).clone();
         let buf = unsafe {unpack_buffer(&buf_ref)};
-
-        rtdebug!("Top: %? Bottom: %?", self.top.load(), b);
 
         self.bottom.store(b);
 
@@ -190,10 +138,6 @@ pub impl<T:Owned> WorkQueue<T> {
         return val;
     }
 
-    #[cfg(stage0)]
-    fn pop(&mut self) -> QueueResult<~T> { Empty }
-
-    #[cfg(not(stage0))]
     fn steal(&mut self) -> QueueResult<~T> {
         let t = self.top.load();
         let b = self.bottom.load();
@@ -216,18 +160,17 @@ pub impl<T:Owned> WorkQueue<T> {
         // but because we actually take the value, a race can also be
         // detected when we get a zero value.
         if owned_ptr_val(&o) != 0 && self.cas_top(t, t+1) {
+            rtdebug!("WorkQueue::steal: stole work");
             Have(o)
         } else {
+            rtdebug!("WorkQueue::steal: lost race");
             Abort
         }
     }
 
-    #[cfg(stage0)]
-    fn steal(&mut self) -> QueueResult<~T> { Empty }
-
     fn is_empty(&self) -> bool {
-        let top = self.top.load();
-        let bottom = self.bottom.load();
+        let top = self.top.load() as int;
+        let bottom = self.bottom.load() as int;
         (top - bottom) <= 0
     }
 
@@ -275,18 +218,29 @@ pub impl<T> WorkBuffer<T> {
         }
     }
 
+    /**
+     * Puts an alement in the buffer
+     */
     unsafe fn put(&mut self, idx:uint, t:~T) {
         let i = self.wrap(idx);
         self.buf.unsafe_set(i, t);
     }
 
+    /**
+     * Gets the length of the buffer
+     */
     fn len(&self) -> uint {
         self.buf.len()
     }
 
+    /**
+     * Doubles the size of the buffer and moves everything into the
+     * new buffer, which is returned. The current buffer is now empty.
+     */
     fn grow(&mut self, bot:uint, top:uint) -> WorkBuffer<T> {
-        rtdebug!("Growing Buffer: %u -> %u", top, bot);
+        rtdebug!("WorkBuffer::grow: growing to %u", self.len() << 1);
         let mut buf = WorkBuffer::new(self.len() << 1);
+
         for uint::range(top, bot) |i| {
             buf.put(i, self.take(i));
         }
@@ -294,9 +248,14 @@ pub impl<T> WorkBuffer<T> {
         buf
     }
 
+    /**
+     * Halves the size of the buffer and moves everything into the
+     * new buffer, which is returned. The current buffer is now empty.
+     */
     fn shrink(&mut self, bot:uint, top:uint) -> WorkBuffer<T> {
-        rtdebug!("Shrinking Buffer: %u -> %u", top, bot);
+        rtdebug!("WorkBuffer::shrink: shrinking to %u", self.len() >> 1);
         let mut buf = WorkBuffer::new(self.len() >> 1);
+
         for uint::range(top, bot) |i| {
             buf.put(i, self.take(i));
         }
@@ -316,12 +275,8 @@ mod test {
 
     use super::*;
     use uint;
-    use comm;
-    use comm::*;
-    use task;
-    use libc;
     use iter::*;
-    use old_iter::*;
+    use vec::*;
 
     #[test]
     fn workbuf() {
@@ -346,6 +301,12 @@ mod test {
     }
 
     #[test]
+    fn work_queue_empty() {
+        let q = WorkQueue::new::<uint>();
+        assert!(q.is_empty());
+    }
+
+    #[test]
     fn work_queue_basic() {
         let mut q = WorkQueue::new();
 
@@ -360,6 +321,7 @@ mod test {
         assert_eq!(q.pop(), Have(~1));
         assert_eq!(q.pop(), Empty);
         assert_eq!(q.pop(), Empty);
+        assert!(q.is_empty());
     }
 
     #[test]
@@ -395,8 +357,69 @@ mod test {
     }
 
     #[test]
-    fn work_queue_concurrent() {
+    fn work_queue_concurrent_steal() {
+        use rt::thread::Thread;
+        use rt::test;
+        use unstable::sync::UnsafeAtomicRcBox;
+        use cell::Cell;
 
+        static NUM_ITEMS : uint = (1 << 13);
+        static NUM_THREADS : uint = 8;
+
+        // Box the queue to share it between threads
+        let wq = WorkQueue::new::<uint>();
+        let qbox = UnsafeAtomicRcBox::new(wq);
+
+        let mut threads : ~[Thread] = ~[];
+
+        // Populate the queue
+        let wq = qbox.get();
+        for uint::range(1, NUM_ITEMS) |i| {
+            unsafe {
+                (*wq).push(~i);
+            }
+        }
+
+        // Start the threads a-stealin'
+        for NUM_THREADS.times {
+            let my_box = Cell(qbox.clone());
+            let t = do test::spawntask_thread {
+                unsafe {
+                    let my_box = my_box.take();
+                    let wq = my_box.get();
+
+                    let mut prev : uint = 0;
+
+                    loop {
+                        let stole = (&mut *wq).steal();
+                        match stole {
+                            Empty => break,
+                            Have(i) => {
+                                assert!(*i > prev);
+                                prev = *i;
+                                // Pretend to do work. This is ok, because
+                                // we know this is the only task in the thread
+                                unsafe { usleep(1000); }
+                            }
+                            Abort => ()
+                        }
+                    }
+                }
+            };
+            threads.push(t);
+        }
+
+        // Kill the array, which makes us wait for the threads
+        // to finish
+        let _ = threads;
+
+        unsafe {
+            assert!((*wq).is_empty());
+        }
+
+        extern "C" {
+            fn usleep(us:uint) -> int;
+        }
     }
 
     #[bench]

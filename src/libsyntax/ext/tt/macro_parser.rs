@@ -258,8 +258,10 @@ pub fn parse(
             let idx = ei.idx;
             let len = ei.elts.len();
 
+
             /* at end of sequence */
             if idx >= len {
+                debug!("parser: At end of sequence");
                 // can't move out of `match`es, so:
                 if is_some(&ei.up) {
                     // hack: a matcher sequence is repeating iff it has a
@@ -314,10 +316,14 @@ pub fn parse(
                     eof_eis.push(ei);
                 }
             } else {
+                debug!("parse: trying token `%?` against `%s` [%u/%u]",
+                       tok, ei_to_str(&ei.elts[idx]), idx, len);
                 match copy ei.elts[idx].node {
                   /* need to descend into sequence */
                   match_seq(ref matchers, ref sep, zero_ok,
                             match_idx_lo, match_idx_hi) => {
+                      debug!("parse: decending into sequence (sep: %?, zero_ok: %?, idx_lo: %?, \
+                          idx_hi: %?)", sep, zero_ok, match_idx_lo, match_idx_hi);
                     if zero_ok {
                         let mut new_ei = copy ei;
                         new_ei.idx += 1u;
@@ -342,12 +348,17 @@ pub fn parse(
                         sp_lo: sp.lo
                     });
                   }
-                  match_nonterminal(_,_,_) => { bb_eis.push(ei) }
+                  match_nonterminal(_,_,_) => {
+                    bb_eis.push(ei);
+                  }
                   match_tok(ref t) => {
                     let mut ei_t = ei;
                     if (*t) == tok {
                         ei_t.idx += 1;
                         next_eis.push(ei_t);
+                        if bb_eis.len() > 0 && next_eis.len() == 1 && (idx+1) >= len {
+                            bb_eis.pop();
+                        }
                     }
                   }
                 }
@@ -368,6 +379,8 @@ pub fn parse(
                 return failure(sp, ~"Unexpected end of macro invocation");
             }
         } else {
+            debug!("parser: continue %u next_eis, %u bb_eis",
+                   next_eis.len(), bb_eis.len());
             if (bb_eis.len() > 0u && next_eis.len() > 0u)
                 || bb_eis.len() > 1u {
                 let nts = str::connect(vec::map(bb_eis, |ei| {
@@ -378,6 +391,7 @@ pub fn parse(
                       }
                       _ => fail!()
                     } }), " or ");
+
                 return error(sp, fmt!(
                     "Local ambiguity: multiple parsing options: \
                      built-in NTs %s or %u other options.",
@@ -441,5 +455,18 @@ pub fn parse_nt(p: &Parser, name: &str) -> nonterminal {
       }
       "matchers" => token::nt_matchers(p.parse_matchers()),
       _ => p.fatal(~"Unsupported builtin nonterminal parser: " + name)
+    }
+}
+
+fn ei_to_str( ei: &matcher) -> ~str {
+    match ei.node {
+        match_nonterminal(ref bind,ref name,_) => {
+            fmt!("%s ('%s')", *ident_to_str(name),
+                 *ident_to_str(bind))
+        }
+        match_tok(ref tok) => {
+            token::to_str(get_ident_interner(),tok)
+        }
+        match_seq(*) => { ~"sequence" }
     }
 }

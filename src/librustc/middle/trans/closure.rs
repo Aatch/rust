@@ -130,7 +130,7 @@ impl EnvAction {
 }
 
 impl EnvValue {
-    pub fn to_str(&self, ccx: @CrateContext) -> ~str {
+    pub fn to_str(&self, ccx: &CrateContext) -> ~str {
         fmt!("%s(%s)", self.action.to_str(), self.datum.to_str(ccx))
     }
 }

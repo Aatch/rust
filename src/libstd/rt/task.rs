@@ -216,5 +216,15 @@ mod test {
             assert!(port.recv() == 10);
         }
     }
+
+    #[test]
+    fn linked_failure() {
+        do run_in_newsched_task() {
+            let res = do spawntask_try {
+                spawntask_random(|| fail!());
+            };
+            assert!(res.is_err());
+        }
+    }
 }
 

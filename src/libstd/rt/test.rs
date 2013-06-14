@@ -18,6 +18,7 @@ use vec::OwnedVector;
 use result::{Result, Ok, Err};
 use unstable::run_in_bare_thread;
 use super::io::net::ip::{IpAddr, Ipv4};
+use rt::comm::oneshot;
 use rt::task::Task;
 use rt::thread::Thread;
 use rt::local::Local;
@@ -213,36 +214,21 @@ pub fn spawntask_random(f: ~fn()) {
 pub fn spawntask_try(f: ~fn()) -> Result<(), ()> {
     use cell::Cell;
     use super::sched::*;
-    use task;
-    use unstable::finally::Finally;
 
-    // Our status variables will be filled in from the scheduler context
-    let mut failed = false;
-    let failed_ptr: *mut bool = &mut failed;
-
-    // Switch to the scheduler
-    let f = Cell(Cell(f));
-    let sched = Local::take::<Scheduler>();
-    do sched.deschedule_running_task_and_then() |sched, old_task| {
-        let old_task = Cell(old_task);
-        let f = f.take();
-        let new_task = ~do Coroutine::new_root(&mut sched.stack_pool) {
-            do (|| {
-                (f.take())()
-            }).finally {
-                // Check for failure then resume the parent task
-                unsafe { *failed_ptr = task::failing(); }
-                let sched = Local::take::<Scheduler>();
-                do sched.switch_running_tasks_and_then(old_task.take()) |sched, new_task| {
-                    sched.enqueue_task(new_task);
-                }
-            }
-        };
-
-        sched.enqueue_task(new_task);
+    let (port, chan) = oneshot();
+    let chan = Cell(chan);
+    let mut new_task = ~Task::new_root();
+    let on_exit: ~fn(bool) = |exit_status| chan.take().send(exit_status);
+    new_task.on_exit = Some(on_exit);
+    let mut sched = Local::take::<Scheduler>();
+    let new_task = ~Coroutine::with_task(&mut sched.stack_pool,
+                                         new_task, f);
+    do sched.switch_running_tasks_and_then(new_task) |sched, old_task| {
+        sched.enqueue_task(old_task);
     }
 
-    if !failed { Ok(()) } else { Err(()) }
+    let exit_status = port.recv();
+    if exit_status { Ok(()) } else { Err(()) }
 }
 
 // Spawn a new task in a new scheduler and return a thread handle.

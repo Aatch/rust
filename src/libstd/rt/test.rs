@@ -48,8 +48,11 @@ pub fn run_in_newsched_task(f: ~fn()) {
 
     do run_in_bare_thread {
         let mut sched = ~new_test_uv_sched();
+        let mut new_task = ~Task::new_root();
+        let on_exit: ~fn(bool) = |exit_status| rtassert!(exit_status);
+        new_task.on_exit = Some(on_exit);
         let task = ~Coroutine::with_task(&mut sched.stack_pool,
-                                         ~Task::new_root(),
+                                         new_task,
                                          f.take());
         sched.enqueue_task(task);
         sched.run();
@@ -95,16 +98,20 @@ pub fn run_in_mt_newsched_task(f: ~fn()) {
 
         let f_cell = Cell(f_cell.take());
         let handles = Cell(handles);
-        let main_task = ~do Coroutine::new_root(&mut scheds[0].stack_pool) {
-            f_cell.take()();
+        let mut new_task = ~Task::new_root();
+        let on_exit: ~fn(bool) = |exit_status| {
 
             let mut handles = handles.take();
             // Tell schedulers to exit
             for handles.each_mut |handle| {
                 handle.send(Shutdown);
             }
-        };
 
+            rtassert!(exit_status);
+        };
+        new_task.on_exit = Some(on_exit);
+        let main_task = ~Coroutine::with_task(&mut scheds[0].stack_pool,
+                                              new_task, f_cell.take());
         scheds[0].enqueue_task(main_task);
 
         let mut threads = ~[];

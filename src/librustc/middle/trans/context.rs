@@ -44,7 +44,6 @@ use middle::trans::shape::{mk_ctxt};
 pub struct CrateContext {
      sess: session::Session,
      llmod: ModuleRef,
-     llcx: ContextRef,
      td: TargetData,
      tn: @TypeNames,
      externs: ExternMap,
@@ -124,10 +123,8 @@ impl CrateContext {
                symbol_hasher: hash::State, link_meta: LinkMeta,
                reachable: reachable::map) -> CrateContext {
         unsafe {
-            let llcx = llvm::LLVMContextCreate();
-            set_task_llcx(llcx);
             let llmod = str::as_c_str(name, |buf| {
-                llvm::LLVMModuleCreateWithNameInContext(buf, llcx)
+                llvm::LLVMModuleCreateWithNameInContext(buf, llvm::LLVMGetGlobalContext())
             });
             let data_layout: &str = sess.targ_cfg.target_strs.data_layout;
             let targ_triple: &str = sess.targ_cfg.target_strs.target_triple;
@@ -154,7 +151,6 @@ impl CrateContext {
             CrateContext {
                   sess: sess,
                   llmod: llmod,
-                  llcx: llcx,
                   td: td,
                   tn: tn,
                   externs: HashMap::new(),
@@ -209,7 +205,7 @@ impl CrateContext {
                   float_type: float_type,
                   opaque_vec_type: T_opaque_vec(targ_cfg),
                   builder: BuilderRef_res(unsafe {
-                      llvm::LLVMCreateBuilderInContext(llcx)
+                      llvm::LLVMCreateBuilder()
                   }),
                   shape_cx: mk_ctxt(llmod),
                   crate_map: crate_map,
@@ -220,28 +216,3 @@ impl CrateContext {
         }
     }
 }
-
-#[unsafe_destructor]
-impl Drop for CrateContext {
-    fn finalize(&self) {
-        unsafe {
-            unset_task_llcx();
-        }
-    }
-}
-
-fn task_local_llcx_key(_v: @ContextRef) {}
-
-pub fn task_llcx() -> ContextRef {
-    let opt = unsafe { local_data::local_data_get(task_local_llcx_key) };
-    *opt.expect("task-local LLVMContextRef wasn't ever set!")
-}
-
-unsafe fn set_task_llcx(c: ContextRef) {
-    local_data::local_data_set(task_local_llcx_key, @c);
-}
-
-unsafe fn unset_task_llcx() {
-    local_data::local_data_pop(task_local_llcx_key);
-}
-

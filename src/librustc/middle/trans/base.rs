@@ -85,8 +85,6 @@ use syntax::visit;
 use syntax::{ast, ast_util, codemap, ast_map};
 use syntax::abi::{X86, X86_64, Arm, Mips};
 
-pub use middle::trans::context::task_llcx;
-
 pub struct icx_popper {
     ccx: @mut CrateContext,
 }
@@ -3108,5 +3106,8 @@ pub fn trans_crate(sess: session::Session,
             io::println(fmt!("%-7u %s", v, k));
         }
     }
+    let link_meta = ccx.link_meta;
+    let llmod = ccx.llmod;
+
     return (llmod, link_meta);
 }

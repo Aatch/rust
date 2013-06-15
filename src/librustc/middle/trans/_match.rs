@@ -381,7 +381,7 @@ pub fn expand_nested_bindings<'r>(bcx: block,
            bcx.to_str(),
            matches_to_str(bcx, m),
            col,
-           bcx.val_str(val));
+           bcx.val_to_str(val));
     let _indenter = indenter();
 
     do m.map |br| {
@@ -428,7 +428,7 @@ pub fn enter_match<'r>(bcx: block,
            bcx.to_str(),
            matches_to_str(bcx, m),
            col,
-           bcx.val_str(val));
+           bcx.val_to_str(val));
     let _indenter = indenter();
 
     let mut result = ~[];
@@ -474,7 +474,7 @@ pub fn enter_default<'r>(bcx: block,
            bcx.to_str(),
            matches_to_str(bcx, m),
            col,
-           bcx.val_str(val));
+           bcx.val_to_str(val));
     let _indenter = indenter();
 
     do enter_match(bcx, dm, m, col, val) |p| {
@@ -521,7 +521,7 @@ pub fn enter_opt<'r>(bcx: block,
            bcx.to_str(),
            matches_to_str(bcx, m),
            col,
-           bcx.val_str(val));
+           bcx.val_to_str(val));
     let _indenter = indenter();
 
     let tcx = bcx.tcx();
@@ -633,7 +633,7 @@ pub fn enter_rec_or_struct<'r>(bcx: block,
            bcx.to_str(),
            matches_to_str(bcx, m),
            col,
-           bcx.val_str(val));
+           bcx.val_to_str(val));
     let _indenter = indenter();
 
     let dummy = @ast::pat {id: 0, node: ast::pat_wild, span: dummy_sp()};
@@ -668,7 +668,7 @@ pub fn enter_tup<'r>(bcx: block,
            bcx.to_str(),
            matches_to_str(bcx, m),
            col,
-           bcx.val_str(val));
+           bcx.val_to_str(val));
     let _indenter = indenter();
 
     let dummy = @ast::pat {id: 0, node: ast::pat_wild, span: dummy_sp()};
@@ -696,7 +696,7 @@ pub fn enter_tuple_struct<'r>(bcx: block,
            bcx.to_str(),
            matches_to_str(bcx, m),
            col,
-           bcx.val_str(val));
+           bcx.val_to_str(val));
     let _indenter = indenter();
 
     let dummy = @ast::pat {id: 0, node: ast::pat_wild, span: dummy_sp()};
@@ -721,7 +721,7 @@ pub fn enter_box<'r>(bcx: block,
            bcx.to_str(),
            matches_to_str(bcx, m),
            col,
-           bcx.val_str(val));
+           bcx.val_to_str(val));
     let _indenter = indenter();
 
     let dummy = @ast::pat {id: 0, node: ast::pat_wild, span: dummy_sp()};
@@ -748,7 +748,7 @@ pub fn enter_uniq<'r>(bcx: block,
            bcx.to_str(),
            matches_to_str(bcx, m),
            col,
-           bcx.val_str(val));
+           bcx.val_to_str(val));
     let _indenter = indenter();
 
     let dummy = @ast::pat {id: 0, node: ast::pat_wild, span: dummy_sp()};
@@ -775,7 +775,7 @@ pub fn enter_region<'r>(bcx: block,
            bcx.to_str(),
            matches_to_str(bcx, m),
            col,
-           bcx.val_str(val));
+           bcx.val_to_str(val));
     let _indenter = indenter();
 
     let dummy = @ast::pat { id: 0, node: ast::pat_wild, span: dummy_sp() };
@@ -1203,9 +1203,7 @@ fn insert_lllocals(bcx: block,
             }
         };
 
-        debug!("binding %? to %s",
-               binding_info.id,
-               val_str(bcx.ccx().tn, llval));
+        debug!("binding %? to %s", binding_info.id, bcx.val_to_str(llval));
         llmap.insert(binding_info.id, llval);
     }
     return bcx;
@@ -1222,7 +1220,7 @@ pub fn compile_guard(bcx: block,
            bcx.to_str(),
            bcx.expr_to_str(guard_expr),
            matches_to_str(bcx, m),
-           vals.map(|v| bcx.val_str(*v)));
+           vals.map(|v| bcx.val_to_str(*v)));
     let _indenter = indenter();
 
     let mut bcx = bcx;
@@ -1273,7 +1271,7 @@ pub fn compile_submatch(bcx: block,
     debug!("compile_submatch(bcx=%s, m=%s, vals=%?)",
            bcx.to_str(),
            matches_to_str(bcx, m),
-           vals.map(|v| bcx.val_str(*v)));
+           vals.map(|v| bcx.val_to_str(*v)));
     let _indenter = indenter();
 
     /*

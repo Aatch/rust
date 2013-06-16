@@ -18,6 +18,8 @@ use middle::trans::common;
 use middle::ty;
 use util::ppaux;
 
+use middle::trans::type_::Type;
+
 use syntax::ast;
 
 pub fn arg_is_indirect(_: &CrateContext, arg_ty: &ty::t) -> bool {
@@ -59,9 +61,9 @@ pub fn type_of_fn(cx: &mut CrateContext, inputs: &[ty::t], output: ty::t)
 
         // Use the output as the actual return value if it's immediate.
         if output_is_immediate {
-            Type::func(atys, lloutputtype)
+            Type::func(atys, &lloutputtype)
         } else {
-            Type::func(atys, Type::void())
+            Type::func(atys, &Type::void())
         }
     }
 }
@@ -87,11 +89,11 @@ pub fn type_of_non_gc_box(cx: &mut CrateContext, t: ty::t) -> Type {
         match ty::get(t).sty {
           ty::ty_box(mt) => {
               let ty = type_of(cx, mt.ty);
-              Type::box(cx, ty).ptr_to()
+              Type::box(cx, &ty).ptr_to()
           }
           ty::ty_uniq(mt) => {
               let ty = type_of(cx, mt.ty);
-              Type::unique(cx, ty).ptr_to()
+              Type::unique(cx, &ty).ptr_to()
           }
           _ => {
             cx.sess.bug("non-box in type_of_non_gc_box");
@@ -146,14 +148,14 @@ pub fn sizing_type_of(cx: &mut CrateContext, t: ty::t) -> Type {
         ty::ty_closure(*) => Type::struct_([Type::i8p(), Type::i8p()], false),
         ty::ty_trait(_, _, store, _) => Type::opaque_trait(cx, store),
 
-        ty::ty_estr(ty::vstore_fixed(size)) => Type::array(Type::i8(), size),
+        ty::ty_estr(ty::vstore_fixed(size)) => Type::array(&Type::i8(), size as u64),
         ty::ty_evec(mt, ty::vstore_fixed(size)) => {
-            Type::array(sizing_type_of(cx, mt.ty), size)
+            Type::array(&sizing_type_of(cx, mt.ty), size as u64)
         }
 
         ty::ty_unboxed_vec(mt) => {
             let sz_ty = sizing_type_of(cx, mt.ty);
-            Type::vec(cx.sess.targ_cfg.arch, sz_ty)
+            Type::vec(cx.sess.targ_cfg.arch, &sz_ty)
         }
 
         ty::ty_tup(*) | ty::ty_enum(*) => {
@@ -165,7 +167,7 @@ pub fn sizing_type_of(cx: &mut CrateContext, t: ty::t) -> Type {
             if ty::type_is_simd(cx.tcx, t) {
                 let et = ty::simd_type(cx.tcx, t);
                 let n = ty::simd_size(cx.tcx, t);
-                Type::vector(type_of(cx, et), n)
+                Type::vector(&type_of(cx, et), n as u64)
             } else {
                 let repr = adt::represent_type(cx, t);
                 let packed = ty::lookup_packed(cx.tcx, did);
@@ -205,14 +207,14 @@ pub fn type_of(cx: &mut CrateContext, t: ty::t) -> Type {
         return llty;
     }
 
-    let llty = match ty::get(t).sty {
+    let mut llty = match ty::get(t).sty {
       ty::ty_nil | ty::ty_bot => Type::nil(),
       ty::ty_bool => Type::bool(),
       ty::ty_int(t) => Type::int_from_ty(cx, t),
       ty::ty_uint(t) => Type::uint_from_ty(cx, t),
       ty::ty_float(t) => Type::float_from_ty(cx, t),
       ty::ty_estr(ty::vstore_uniq) => {
-        Type::unique(cx, Type::vec(cx.sess.targ_cfg.arch, Type::i8())).ptr_to()
+        Type::unique(cx, &Type::vec(cx.sess.targ_cfg.arch, &Type::i8())).ptr_to()
       }
       ty::ty_enum(did, ref substs) => {
         // Only create the named struct, but don't fill it in. We
@@ -223,30 +225,30 @@ pub fn type_of(cx: &mut CrateContext, t: ty::t) -> Type {
         Type::named_struct(llvm_type_name(cx, an_enum, did, substs.tps))
       }
       ty::ty_estr(ty::vstore_box) => {
-        Type::box(cx, Type::vec(cx, Type::i8())).ptr_to()
+        Type::box(cx, &Type::vec(cx.sess.targ_cfg.arch, &Type::i8())).ptr_to()
       }
       ty::ty_evec(ref mt, ty::vstore_box) => {
           let e_ty = type_of(cx, mt.ty);
-          let v_ty = Type::vec(cx.sess.targ_cfg.arch, e_ty);
-          Type::box(cx, v_ty).ptr_to()
+          let v_ty = Type::vec(cx.sess.targ_cfg.arch, &e_ty);
+          Type::box(cx, &v_ty).ptr_to()
       }
       ty::ty_box(ref mt) => {
           let ty = type_of(cx, mt.ty);
-          Type::box(cx, ty).ptr_to()
+          Type::box(cx, &ty).ptr_to()
       }
       ty::ty_opaque_box => Type::opaque_box(cx).ptr_to(),
       ty::ty_uniq(ref mt) => {
           let ty = type_of(cx, mt.ty);
-          Type::unique(cx, ty).ptr_to()
+          Type::unique(cx, &ty).ptr_to()
       }
       ty::ty_evec(ref mt, ty::vstore_uniq) => {
           let ty = type_of(cx, mt.ty);
-          let ty = Type::vec(cx, ty);
-          Type::unique(cx, ty).ptr_to()
+          let ty = Type::vec(cx.sess.targ_cfg.arch, &ty);
+          Type::unique(cx, &ty).ptr_to()
       }
       ty::ty_unboxed_vec(ref mt) => {
           let ty = type_of(cx, mt.ty);
-          Type::vec(cx.sess.targ_cfg.arch, ty)
+          Type::vec(cx.sess.targ_cfg.arch, &ty)
       }
       ty::ty_ptr(ref mt) => type_of(cx, mt.ty).ptr_to(),
       ty::ty_rptr(_, ref mt) => type_of(cx, mt.ty).ptr_to(),
@@ -263,20 +265,20 @@ pub fn type_of(cx: &mut CrateContext, t: ty::t) -> Type {
       }
 
       ty::ty_estr(ty::vstore_fixed(n)) => {
-          Type::array(Type::i8(), n + 1u /* +1 for trailing null */)
+          Type::array(&Type::i8(), (n + 1u) as u64)
       }
 
       ty::ty_evec(ref mt, ty::vstore_fixed(n)) => {
-          Type::array(type_of(cx, mt.ty), n)
+          Type::array(&type_of(cx, mt.ty), n as u64)
       }
 
       ty::ty_bare_fn(_) => type_of_fn_from_ty(cx, t).ptr_to(),
       ty::ty_closure(_) => {
           let ty = type_of_fn_from_ty(cx, t);
-          Type::func_pair(cx, ty)
+          Type::func_pair(cx, &ty)
       }
       ty::ty_trait(_, _, store, _) => Type::opaque_trait(cx, store),
-      ty::ty_type => cx.tydesc_type.to_ptr(),
+      ty::ty_type => cx.tydesc_type.ptr_to(),
       ty::ty_tup(*) => {
           let repr = adt::represent_type(cx, t);
           Type::struct_(adt::fields_of(cx, repr), false)
@@ -286,7 +288,7 @@ pub fn type_of(cx: &mut CrateContext, t: ty::t) -> Type {
           if ty::type_is_simd(cx.tcx, t) {
               let et = ty::simd_type(cx.tcx, t);
               let n = ty::simd_size(cx.tcx, t);
-              Type::vector(type_of(cx, et), n)
+              Type::vector(&type_of(cx, et), n as u64)
           } else {
               // Only create the named struct, but don't fill it in. We fill it
               // in *after* placing it into the type cache. This prevents
@@ -306,16 +308,14 @@ pub fn type_of(cx: &mut CrateContext, t: ty::t) -> Type {
     match ty::get(t).sty {
       ty::ty_enum(*) => {
           let repr = adt::represent_type(cx, t);
-          common::set_struct_body(llty, adt::fields_of(cx, repr),
-                                  false);
+          llty.set_struct_body(adt::fields_of(cx, repr), false);
       }
 
       ty::ty_struct(did, _) => {
         if !ty::type_is_simd(cx.tcx, t) {
           let repr = adt::represent_type(cx, t);
           let packed = ty::lookup_packed(cx.tcx, did);
-          common::set_struct_body(llty, adt::fields_of(cx, repr),
-                                  packed);
+          llty.set_struct_body(adt::fields_of(cx, repr), packed);
         }
       }
       _ => ()
@@ -343,21 +343,7 @@ pub fn llvm_type_name(cx: &CrateContext,
     }
 }
 
-/*
 pub fn type_of_dtor(ccx: &mut CrateContext, self_ty: ty::t) -> Type {
     let self_ty = type_of(ccx, self_ty).ptr_to();
-    Type::func([self_ty], Type::nil())
+    Type::func([self_ty], &Type::nil())
 }
-
-pub fn type_of_rooted(ccx: &mut CrateContext, t: ty::t) -> Type {
-    let addrspace = base::get_tydesc(ccx, t).addrspace;
-    debug!("type_of_rooted %s in addrspace %u",
-           ppaux::ty_to_str(ccx.tcx, t), addrspace as uint);
-    return T_root(type_of(ccx, t), addrspace);
-}
-
-pub fn type_of_glue_fn(ccx: &CrateContext) -> Type {
-    let tydescpp = T_ptr(T_ptr(ccx.tydesc_type));
-    return T_fn([T_ptr(T_nil()), tydescpp, T_ptr(T_i8())], T_nil());
-}
-*/

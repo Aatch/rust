@@ -20,6 +20,7 @@
 #[license = "MIT/ASL2"];
 #[crate_type = "lib"];
 
+#[allow(default_methods)];
 #[allow(non_camel_case_types)];
 #[deny(deprecated_pattern)];
 
@@ -45,6 +46,7 @@ pub mod ast;
 pub mod ast_util;
 pub mod ast_map;
 pub mod visit;
+pub mod visit_new;
 pub mod fold;
 
 

@@ -405,7 +405,11 @@ pub fn ast_ty_to_ty<AC:AstConv, RS:region_scope + Copy + 'static>(
                                       ast_ty.span);
           ty::mk_closure(tcx, fn_decl)
       }
+<<<<<<< HEAD
       ast::ty_path(ref path, ref bounds, id) => {
+=======
+      ast::ty_path(ref path, bounds, id) => {
+>>>>>>> De-managed ast::Path
         let a_def = match tcx.def_map.find(&id) {
           None => tcx.sess.span_fatal(
               ast_ty.span, fmt!("unbound path %s",

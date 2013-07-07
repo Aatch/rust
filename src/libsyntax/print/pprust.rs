@@ -785,8 +785,7 @@ pub fn print_variant(s: @ps, v: &ast::variant) {
         }
         ast::struct_variant_kind(struct_def) => {
             head(s, "");
-            let generics = ast_util::empty_generics();
-            print_struct(s, struct_def, &generics, v.node.name, v.span);
+            print_struct(s, struct_def, &ast_util::NO_GENERICS, v.node.name, v.span);
         }
     }
     match v.node.disr_expr {
@@ -1180,11 +1179,11 @@ pub fn print_expr(s: @ps, expr: &ast::expr) {
       ast::expr_binary(_, op, lhs, rhs) => {
         print_expr(s, lhs);
         space(s.s);
-        word_space(s, ast_util::binop_to_str(op));
+        word_space(s, op.as_str());
         print_expr(s, rhs);
       }
       ast::expr_unary(_, op, expr) => {
-        word(s.s, ast_util::unop_to_str(op));
+        word(s.s, op.as_str());
         print_expr(s, expr);
       }
       ast::expr_addr_of(m, expr) => {
@@ -1338,7 +1337,7 @@ pub fn print_expr(s: @ps, expr: &ast::expr) {
       ast::expr_assign_op(_, op, lhs, rhs) => {
         print_expr(s, lhs);
         space(s.s);
-        word(s.s, ast_util::binop_to_str(op));
+        word(s.s, op.as_str());
         word_space(s, "=");
         print_expr(s, rhs);
       }
@@ -2025,17 +2024,13 @@ pub fn print_literal(s: @ps, lit: &ast::lit) {
         if i < 0_i64 {
             word(s.s,
                  ~"-" + u64::to_str_radix(-i as u64, 10u)
-                 + ast_util::int_ty_to_str(t));
+                 + t.as_str());
         } else {
-            word(s.s,
-                 u64::to_str_radix(i as u64, 10u)
-                 + ast_util::int_ty_to_str(t));
+            word(s.s, u64::to_str_radix(i as u64, 10u) + t.as_str());
         }
       }
       ast::lit_uint(u, t) => {
-        word(s.s,
-             u64::to_str_radix(u, 10u)
-             + ast_util::uint_ty_to_str(t));
+        word(s.s, u64::to_str_radix(u, 10u) + t.as_str());
       }
       ast::lit_int_unsuffixed(i) => {
         if i < 0_i64 {
@@ -2045,7 +2040,7 @@ pub fn print_literal(s: @ps, lit: &ast::lit) {
         }
       }
       ast::lit_float(f, t) => {
-        word(s.s, f.to_owned() + ast_util::float_ty_to_str(t));
+        word(s.s, f.to_owned() + t.as_str());
       }
       ast::lit_float_unsuffixed(f) => word(s.s, f),
       ast::lit_nil => word(s.s, "()"),

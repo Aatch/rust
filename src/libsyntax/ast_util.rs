@@ -15,6 +15,8 @@ use codemap::{span, spanned};
 use opt_vec;
 use parse::token;
 use visit;
+use visit_new;
+use visit_new::{Visitor,FnKind,FnKindMethod};
 
 use std::hashmap::HashMap;
 use std::int;
@@ -71,126 +73,205 @@ pub fn def_id_of_def(d: def) -> def_id {
     }
 }
 
-pub fn binop_to_str(op: binop) -> ~str {
-    match op {
-      add => return ~"+",
-      subtract => return ~"-",
-      mul => return ~"*",
-      div => return ~"/",
-      rem => return ~"%",
-      and => return ~"&&",
-      or => return ~"||",
-      bitxor => return ~"^",
-      bitand => return ~"&",
-      bitor => return ~"|",
-      shl => return ~"<<",
-      shr => return ~">>",
-      eq => return ~"==",
-      lt => return ~"<",
-      le => return ~"<=",
-      ne => return ~"!=",
-      ge => return ~">=",
-      gt => return ~">"
+impl ToStr for binop {
+    #[inline]
+    fn to_str(&self) -> ~str {
+        (*self).as_str().to_owned()
     }
 }
 
-pub fn binop_to_method_name(op: binop) -> Option<~str> {
-    match op {
-      add => return Some(~"add"),
-      subtract => return Some(~"sub"),
-      mul => return Some(~"mul"),
-      div => return Some(~"div"),
-      rem => return Some(~"rem"),
-      bitxor => return Some(~"bitxor"),
-      bitand => return Some(~"bitand"),
-      bitor => return Some(~"bitor"),
-      shl => return Some(~"shl"),
-      shr => return Some(~"shr"),
-      lt => return Some(~"lt"),
-      le => return Some(~"le"),
-      ge => return Some(~"ge"),
-      gt => return Some(~"gt"),
-      eq => return Some(~"eq"),
-      ne => return Some(~"ne"),
-      and | or => return None
+impl binop {
+
+    #[inline]
+    // This technically shouldn't be "as_str", but it doesn't allocate
+    // and that's the point of the `as_*` naming.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            add      => "+",
+            subtract => "-",
+            mul      => "*",
+            div      => "/",
+            rem      => "%",
+            and      => "&&",
+            or       => "||",
+            bitxor   => "^",
+            bitand   => "&",
+            bitor    => "|",
+            shl      => "<<",
+            shr      => ">>",
+            eq       => "==",
+            lt       => "<",
+            le       => "<=",
+            ne       => "!=",
+            ge       => ">=",
+            gt       => ">"
+        }
+    }
+
+    #[inline]
+    pub fn method_name(self) -> Option<&'static str> {
+        match self {
+            add      => Some("add"),
+            subtract => Some("sub"),
+            mul      => Some("mul"),
+            div      => Some("div"),
+            rem      => Some("rem"),
+            bitxor   => Some("bitxor"),
+            bitand   => Some("bitand"),
+            bitor    => Some("bitor"),
+            shl      => Some("shl"),
+            shr      => Some("shr"),
+            lt       => Some("lt"),
+            le       => Some("le"),
+            ge       => Some("ge"),
+            gt       => Some("gt"),
+            eq       => Some("eq"),
+            ne       => Some("ne"),
+            and | or => None
+        }
+    }
+
+    #[inline]
+    pub fn is_lazy(self) -> bool {
+        match self {
+            and | or => true,
+            _        => false
+        }
+    }
+
+    #[inline]
+    pub fn is_shift(self) -> bool {
+        match self {
+            shl | shr => true,
+            _         => false
+        }
     }
 }
 
-pub fn lazy_binop(b: binop) -> bool {
-    match b {
-      and => true,
-      or => true,
-      _ => false
+impl ToStr for unop {
+    #[inline]
+    fn to_str(&self) -> ~str {
+        (*self).as_str().to_owned()
     }
 }
 
-pub fn is_shift_binop(b: binop) -> bool {
-    match b {
-      shl => true,
-      shr => true,
-      _ => false
+impl unop {
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            box(m_mutbl) => "@mut",
+            box(_)       => "@",
+            uniq         => "~",
+            deref        => "*",
+            not          => "!",
+            neg          => "-"
+        }
     }
 }
 
-pub fn unop_to_str(op: unop) -> ~str {
-    match op {
-      box(mt) => if mt == m_mutbl { ~"@mut " } else { ~"@" },
-      uniq => ~"~",
-      deref => ~"*",
-      not => ~"!",
-      neg => ~"-"
+impl expr {
+    #[inline]
+    pub fn is_path(&self) -> bool {
+        match self.node {
+            expr_path(_) => true,
+            _ =>            false
+        }
+    }
+
+    #[inline]
+    pub fn is_call(&self) -> bool {
+        self.node.is_call()
+    }
+
+}
+
+impl expr_ {
+    #[inline]
+    pub fn is_call(&self) -> bool {
+        match self {
+            &expr_call(*) => true,
+            _             => false
+        }
     }
 }
 
-pub fn is_path(e: @expr) -> bool {
-    return match e.node { expr_path(_) => true, _ => false };
-}
-
-pub fn int_ty_to_str(t: int_ty) -> ~str {
-    match t {
-      ty_char => ~"u8", // ???
-      ty_i => ~"",
-      ty_i8 => ~"i8",
-      ty_i16 => ~"i16",
-      ty_i32 => ~"i32",
-      ty_i64 => ~"i64"
+impl ToStr for int_ty {
+    #[inline]
+    fn to_str(&self) -> ~str {
+        (*self).as_str().to_owned()
     }
 }
 
-pub fn int_ty_max(t: int_ty) -> u64 {
-    match t {
-      ty_i8 => 0x80u64,
-      ty_i16 => 0x8000u64,
-      ty_i | ty_char | ty_i32 => 0x80000000u64, // actually ni about ty_i
-      ty_i64 => 0x8000000000000000u64
+impl int_ty {
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ty_char => "char", // This shouldn't even be here
+            ty_i    => "i",
+            ty_i8   => "i8",
+            ty_i16  => "i16",
+            ty_i32  => "i32",
+            ty_i64  => "i64"
+        }
+    }
+
+    #[inline]
+    pub fn max(self) -> u64 {
+        match self {
+            ty_i8   => 0x80,
+            ty_i16  => 0x8000,
+            ty_i | ty_char | ty_i32 => 0x8000_0000,
+            ty_i64  => 0x8000_0000_0000_000
+        }
     }
 }
 
-pub fn uint_ty_to_str(t: uint_ty) -> ~str {
-    match t {
-      ty_u => ~"u",
-      ty_u8 => ~"u8",
-      ty_u16 => ~"u16",
-      ty_u32 => ~"u32",
-      ty_u64 => ~"u64"
+impl ToStr for uint_ty {
+    #[inline]
+    fn to_str(&self) -> ~str {
+        (*self).as_str().to_owned()
     }
 }
 
-pub fn uint_ty_max(t: uint_ty) -> u64 {
-    match t {
-      ty_u8 => 0xffu64,
-      ty_u16 => 0xffffu64,
-      ty_u | ty_u32 => 0xffffffffu64, // actually ni about ty_u
-      ty_u64 => 0xffffffffffffffffu64
+impl uint_ty {
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ty_u   => "u",
+            ty_u8  => "u8",
+            ty_u16 => "u16",
+            ty_u32 => "u32",
+            ty_u64 => "u64"
+        }
+    }
+
+    #[inline]
+    pub fn uint_ty_max(self) -> u64 {
+        match self {
+            ty_u8  => 0xffu64,
+            ty_u16 => 0xffffu64,
+            ty_u | ty_u32 => 0xffffffffu64, // actually ni about ty_u
+            ty_u64 => 0xffffffffffffffffu64
+        }
+    }
+
+}
+
+impl ToStr for float_ty {
+    #[inline]
+    fn to_str(&self) -> ~str {
+        (*self).as_str().to_owned()
     }
 }
 
-pub fn float_ty_to_str(t: float_ty) -> ~str {
-    match t { ty_f => ~"f", ty_f32 => ~"f32", ty_f64 => ~"f64" }
-}
-
-pub fn is_call_expr(e: @expr) -> bool {
-    match e.node { expr_call(*) => true, _ => false }
+impl float_ty {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ty_f   => "f",
+            ty_f32 => "f32",
+            ty_f64 => "f64"
+        }
+    }
 }
 
 pub fn block_from_expr(e: @expr) -> blk {
@@ -198,26 +279,26 @@ pub fn block_from_expr(e: @expr) -> blk {
     return spanned {node: blk_, span: e.span};
 }
 
-pub fn default_block(
-    stmts1: ~[@stmt],
-    expr1: Option<@expr>,
-    id1: node_id
-) -> blk_ {
+pub fn default_block (stmts: ~[@stmt],
+                      expr: Option<@expr>,
+                      id: node_id) -> blk_ {
     ast::blk_ {
         view_items: ~[],
-        stmts: stmts1,
-        expr: expr1,
-        id: id1,
+        stmts: stmts,
+        expr: expr,
+        id: id,
         rules: default_blk,
     }
 }
 
 pub fn ident_to_path(s: span, i: ident) -> Path {
-    ast::Path { span: s,
-                 global: false,
-                 idents: ~[i],
-                 rp: None,
-                 types: ~[] }
+    ast::Path {
+        span: s,
+        global: false,
+        idents: ~[i],
+        rp: None,
+        types: ~[]
+    }
 }
 
 pub fn ident_to_pat(id: node_id, s: span, i: ident) -> @pat {
@@ -286,34 +367,31 @@ pub fn struct_field_visibility(field: ast::struct_field) -> visibility {
     }
 }
 
-pub trait inlined_item_utils {
-    fn ident(&self) -> ident;
-    fn id(&self) -> ast::node_id;
-    fn accept<E: Copy>(&self, e: E, v: visit::vt<E>);
-}
-
-impl inlined_item_utils for inlined_item {
+impl inlined_item {
     fn ident(&self) -> ident {
         match *self {
-            ii_item(i) => /* FIXME (#2543) */ copy i.ident,
-            ii_foreign(i) => /* FIXME (#2543) */ copy i.ident,
-            ii_method(_, m) => /* FIXME (#2543) */ copy m.ident,
+            ii_item(@ref i)      => i.ident,
+            ii_foreign(@ref i)   => i.ident,
+            ii_method(_, @ref m) => m.ident,
         }
     }
 
     fn id(&self) -> ast::node_id {
         match *self {
-            ii_item(i) => i.id,
-            ii_foreign(i) => i.id,
-            ii_method(_, m) => m.id,
+            ii_item(@ref i)      => i.id,
+            ii_foreign(@ref i)   => i.id,
+            ii_method(_, @ref m) => m.id,
         }
     }
 
-    fn accept<E: Copy>(&self, e: E, v: visit::vt<E>) {
-        match *self {
-            ii_item(i) => (v.visit_item)(i, (e, v)),
-            ii_foreign(i) => (v.visit_foreign_item)(i, (e, v)),
-            ii_method(_, m) => visit::visit_method_helper(m, (e, v)),
+    fn accept<V:Visitor>(&self, v: &mut V) {
+        match self {
+            &ii_item(@ref i) => v.visit_item(i),
+            &ii_foreign(@ref i) => v.visit_foreign_item(i),
+            &ii_method(_, @ref m) => {
+                let fk = visit_new::FnKindMethod(&m.ident, &m.generics, m);
+                v.visit_fn(&fk, &m.decl, &m.body, m.span, m.id);
+            }
         }
     }
 }
@@ -345,14 +423,14 @@ pub fn operator_prec(op: ast::binop) -> uint {
   }
 }
 
+pub static NO_GENERICS : Generics = Generics {
+    lifetimes: opt_vec::Empty,
+    ty_params: opt_vec::Empty,
+};
+
 /// Precedence of the `as` operator, which is a binary operator
 /// not appearing in the prior table.
 pub static as_prec: uint = 11u;
-
-pub fn empty_generics() -> Generics {
-    Generics {lifetimes: opt_vec::Empty,
-              ty_params: opt_vec::Empty}
-}
 
 // ______________________________________________________________________
 // Enumerating the IDs which appear in an AST
@@ -381,139 +459,146 @@ impl id_range {
     }
 }
 
-pub fn id_visitor<T: Copy>(vfn: @fn(node_id, T)) -> visit::vt<T> {
-    let visit_generics: @fn(&Generics, T) = |generics, t| {
-        for generics.ty_params.iter().advance |p| {
-            vfn(p.id, copy t);
+pub struct IdVisitor<'self> {
+    op: &'self fn(node_id)
+}
+
+impl<'self> Visitor for IdVisitor<'self> {
+
+    pub fn visit_mod(&mut self, m: &_mod, sp: span, id: node_id) {
+        self.id(id);
+        self.visit_mod_contents(m, sp, id);
+    }
+
+    pub fn visit_view_item(&mut self, vi: &view_item) {
+        match vi.node {
+            view_item_extern_mod(_, _, id) => self.id(id),
+            view_item_use(ref vps) => {
+                for vps.iter().advance |vp| {
+                    match vp.node {
+                        view_path_glob(_, id)
+                      | view_path_simple(_, _, id) => self.id(id),
+                        view_path_list(_, ref paths, id) => {
+                            self.id(id);
+                            for paths.iter().advance |p| {
+                                self.id(id);
+                            }
+                        }
+                    }
+                }
+            }
         }
-        for generics.lifetimes.iter().advance |p| {
-            vfn(p.id, copy t);
+    }
+
+    pub fn visit_foreign_item(&mut self, fi: &foreign_item) {
+        self.id(fi.id);
+        self.visit_foreign_item_contents(fi);
+    }
+
+    pub fn visit_item(&mut self, i: &item) {
+        self.id(i.id);
+        match i.node {
+            item_enum(ref enum_def, _) => {
+                for enum_def.variants.iter().advance |v| {
+                    self.id(v.node.id)
+                }
+            }
+            _ => ()
         }
+        self.visit_item_contents(i);
+    }
+
+    pub fn visit_local(&mut self, l: &local) {
+        self.id(l.node.id);
+        self.visit_local_contents(l);
+    }
+
+    pub fn visit_block(&mut self, b: &blk) {
+        self.id(b.node.id);
+        self.visit_block_contents(b);
+    }
+
+    pub fn visit_stmt(&mut self, s: &stmt) {
+        self.id(ast_util::stmt_id(s));
+        self.visit_stmt_contents(s);
+    }
+
+    pub fn visit_pat(&mut self, p: &pat) {
+        self.id(p.id);
+        self.visit_pat_contents(p);
+    }
+
+    pub fn visit_expr(&mut self, e: &expr) {
+        let r = e.get_callee_id();
+        for r.iter().advance |&callee_id| {
+            self.id(callee_id);
+        }
+        self.id(e.id);
+        self.visit_expr_contents(e);
+    }
+
+    pub fn visit_ty(&mut self, ty: &Ty) {
+        match ty.node {
+            ty_path(_, _, id) => self.id(id),
+            _ => ()
+        }
+        self.visit_ty_contents(ty);
+    }
+
+    pub fn visit_generics(&mut self, g: &Generics) {
+        for g.ty_params.iter().advance |p| {
+            self.id(p.id);
+        }
+        for g.lifetimes.iter().advance |p| {
+            self.id(p.id);
+        }
+        self.visit_generics_contents(g);
+    }
+
+    pub fn visit_fn(&mut self, fk: &FnKind, dec: &fn_decl, body: &blk, sp: span, id: node_id) {
+        self.id(id);
+
+        match fk {
+            &FnKindMethod(_, _, m) => {
+                self.id(m.self_id);
+            }
+            _ => ()
+        }
+
+        for dec.inputs.iter().advance |arg| {
+            self.id(arg.id);
+        }
+        self.visit_fn_contents(fk, dec, body, sp, id);
+    }
+
+    pub fn visit_struct_field(&mut self, sf: &struct_field) {
+        self.id(sf.node.id);
+        self.visit_struct_field_contents(sf);
+    }
+}
+
+impl<'self> IdVisitor<'self> {
+    pub fn id(&self, id: node_id) {
+        (self.op)(id)
+    }
+}
+
+
+
+pub fn visit_ids_for_inlined_item(item: &inlined_item, op: &fn(node_id)) {
+    let mut visitor = IdVisitor {
+        op: op
     };
-    visit::mk_vt(@visit::Visitor {
-        visit_mod: |m, sp, id, (t, vt)| {
-            vfn(id, copy t);
-            visit::visit_mod(m, sp, id, (t, vt));
-        },
 
-        visit_view_item: |vi, (t, vt)| {
-            match vi.node {
-              view_item_extern_mod(_, _, id) => vfn(id, copy t),
-              view_item_use(ref vps) => {
-                  for vps.iter().advance |vp| {
-                      match vp.node {
-                          view_path_simple(_, _, id) => vfn(id, copy t),
-                          view_path_glob(_, id) => vfn(id, copy t),
-                          view_path_list(_, ref paths, id) => {
-                              vfn(id, copy t);
-                              for paths.iter().advance |p| {
-                                  vfn(p.node.id, copy t);
-                              }
-                          }
-                      }
-                  }
-              }
-            }
-            visit::visit_view_item(vi, (t, vt));
-        },
-
-        visit_foreign_item: |ni, (t, vt)| {
-            vfn(ni.id, copy t);
-            visit::visit_foreign_item(ni, (t, vt));
-        },
-
-        visit_item: |i, (t, vt)| {
-            vfn(i.id, copy t);
-            match i.node {
-              item_enum(ref enum_definition, _) =>
-                for (*enum_definition).variants.iter().advance |v| { vfn(v.node.id, copy t); },
-              _ => ()
-            }
-            visit::visit_item(i, (t, vt));
-        },
-
-        visit_local: |l, (t, vt)| {
-            vfn(l.node.id, copy t);
-            visit::visit_local(l, (t, vt));
-        },
-        visit_block: |b, (t, vt)| {
-            vfn(b.node.id, copy t);
-            visit::visit_block(b, (t, vt));
-        },
-        visit_stmt: |s, (t, vt)| {
-            vfn(ast_util::stmt_id(s), copy t);
-            visit::visit_stmt(s, (t, vt));
-        },
-        visit_pat: |p, (t, vt)| {
-            vfn(p.id, copy t);
-            visit::visit_pat(p, (t, vt));
-        },
-
-        visit_expr: |e, (t, vt)| {
-            {
-                let r = e.get_callee_id();
-                for r.iter().advance |callee_id| {
-                    vfn(*callee_id, copy t);
-                }
-            }
-            vfn(e.id, copy t);
-            visit::visit_expr(e, (t, vt));
-        },
-
-        visit_ty: |ty, (t, vt)| {
-            match ty.node {
-              ty_path(_, _, id) => vfn(id, copy t),
-              _ => { /* fall through */ }
-            }
-            visit::visit_ty(ty, (t, vt));
-        },
-
-        visit_generics: |generics, (t, vt)| {
-            visit_generics(generics, copy t);
-            visit::visit_generics(generics, (t, vt));
-        },
-
-        visit_fn: |fk, d, a, b, id, (t, vt)| {
-            vfn(id, copy t);
-
-            match *fk {
-                visit::fk_item_fn(_, generics, _, _) => {
-                    visit_generics(generics, copy t);
-                }
-                visit::fk_method(_, generics, m) => {
-                    vfn(m.self_id, copy t);
-                    visit_generics(generics, copy t);
-                }
-                visit::fk_anon(_) |
-                visit::fk_fn_block => {
-                }
-            }
-
-            for d.inputs.iter().advance |arg| {
-                vfn(arg.id, copy t)
-            }
-            visit::visit_fn(fk, d, a, b, id, (copy t, vt));
-        },
-
-        visit_struct_field: |f, (t, vt)| {
-            vfn(f.node.id, copy t);
-            visit::visit_struct_field(f, (t, vt));
-        },
-
-        .. *visit::default_visitor()
-    })
+    item.accept(&mut visitor);
 }
 
-pub fn visit_ids_for_inlined_item(item: &inlined_item, vfn: @fn(node_id)) {
-    item.accept((), id_visitor(|id, ()| vfn(id)));
-}
-
-pub fn compute_id_range(visit_ids_fn: &fn(@fn(node_id))) -> id_range {
-    let result = @mut id_range::max();
+pub fn compute_id_range(visit_ids_fn: &fn(&fn(node_id))) -> id_range {
+    let mut result = id_range::max();
     do visit_ids_fn |id| {
         result.add(id);
     }
-    *result
+    result
 }
 
 pub fn compute_id_range_for_inlined_item(item: &inlined_item) -> id_range {

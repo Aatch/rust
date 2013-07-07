@@ -10,7 +10,6 @@
 
 use ast;
 use ast::Name;
-use ast_util;
 use parse::token;
 use util::interner::StrInterner;
 use util::interner;
@@ -173,10 +172,10 @@ pub fn to_str(in: @ident_interner, t: &Token) -> ~str {
           res
       }
       LIT_INT(i, t) => {
-          i.to_str() + ast_util::int_ty_to_str(t)
+          i.to_str() + t.as_str()
       }
       LIT_UINT(u, t) => {
-          u.to_str() + ast_util::uint_ty_to_str(t)
+          u.to_str() + t.as_str()
       }
       LIT_INT_UNSUFFIXED(i) => { i.to_str() }
       LIT_FLOAT(ref s, t) => {
@@ -184,7 +183,7 @@ pub fn to_str(in: @ident_interner, t: &Token) -> ~str {
         if body.ends_with(".") {
             body.push_char('0');  // `10.f` is not a float literal
         }
-        body + ast_util::float_ty_to_str(t)
+        body + t.as_str()
       }
       LIT_FLOAT_UNSUFFIXED(ref s) => {
         let mut body = ident_to_str(s).to_owned();
@@ -228,27 +227,27 @@ pub fn to_str(in: @ident_interner, t: &Token) -> ~str {
 
 pub fn can_begin_expr(t: &Token) -> bool {
     match *t {
-      LPAREN => true,
-      LBRACE => true,
-      LBRACKET => true,
-      IDENT(_, _) => true,
-      UNDERSCORE => true,
-      TILDE => true,
-      LIT_INT(_, _) => true,
-      LIT_UINT(_, _) => true,
-      LIT_INT_UNSUFFIXED(_) => true,
-      LIT_FLOAT(_, _) => true,
+      LPAREN                  => true,
+      LBRACE                  => true,
+      LBRACKET                => true,
+      IDENT(_, _)             => true,
+      UNDERSCORE              => true,
+      TILDE                   => true,
+      LIT_INT(_, _)           => true,
+      LIT_UINT(_, _)          => true,
+      LIT_INT_UNSUFFIXED(_)   => true,
+      LIT_FLOAT(_, _)         => true,
       LIT_FLOAT_UNSUFFIXED(_) => true,
-      LIT_STR(_) => true,
-      POUND => true,
-      AT => true,
-      NOT => true,
-      BINOP(MINUS) => true,
-      BINOP(STAR) => true,
-      BINOP(AND) => true,
-      BINOP(OR) => true, // in lambda syntax
-      OROR => true, // in lambda syntax
-      MOD_SEP => true,
+      LIT_STR(_)              => true,
+      POUND                   => true,
+      AT                      => true,
+      NOT                     => true,
+      BINOP(MINUS)            => true,
+      BINOP(STAR)             => true,
+      BINOP(AND)              => true,
+      BINOP(OR)               => true, // in lambda syntax
+      OROR                    => true, // in lambda syntax
+      MOD_SEP                 => true,
       INTERPOLATED(nt_expr(*))
       | INTERPOLATED(nt_ident(*))
       | INTERPOLATED(nt_block(*))
@@ -260,12 +259,12 @@ pub fn can_begin_expr(t: &Token) -> bool {
 /// what's the opposite delimiter?
 pub fn flip_delimiter(t: &token::Token) -> token::Token {
     match *t {
-      LPAREN => RPAREN,
-      LBRACE => RBRACE,
-      LBRACKET => RBRACKET,
-      RPAREN => LPAREN,
-      RBRACE => LBRACE,
-      RBRACKET => LBRACKET,
+      LPAREN    => RPAREN,
+      LBRACE    => RBRACE,
+      LBRACKET  => RBRACKET,
+      RPAREN    => LPAREN,
+      RBRACE    => LBRACE,
+      RBRACKET  => LBRACKET,
       _ => fail!()
     }
 }
@@ -274,12 +273,12 @@ pub fn flip_delimiter(t: &token::Token) -> token::Token {
 
 pub fn is_lit(t: &Token) -> bool {
     match *t {
-      LIT_INT(_, _) => true,
-      LIT_UINT(_, _) => true,
-      LIT_INT_UNSUFFIXED(_) => true,
-      LIT_FLOAT(_, _) => true,
-      LIT_FLOAT_UNSUFFIXED(_) => true,
-      LIT_STR(_) => true,
+      LIT_INT(_, _)             => true,
+      LIT_UINT(_, _)            => true,
+      LIT_INT_UNSUFFIXED(_)     => true,
+      LIT_FLOAT(_, _)           => true,
+      LIT_FLOAT_UNSUFFIXED(_)   => true,
+      LIT_STR(_)                => true,
       _ => false
     }
 }

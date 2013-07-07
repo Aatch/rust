@@ -58,7 +58,7 @@ impl proto_parser for parser::Parser {
         let generics = if *self.token == token::LT {
             self.parse_generics()
         } else {
-            ast_util::empty_generics()
+            ast_util::NO_GENERICS
         };
 
         let state = proto.add_state_poly(name, id, dir, generics);

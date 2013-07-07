@@ -3228,7 +3228,7 @@ impl Parser {
                 |p| p.parse_ty_param());
             ast::Generics { lifetimes: lifetimes, ty_params: ty_params }
         } else {
-            ast_util::empty_generics()
+            ast_util::NO_GENERICS
         }
     }
 

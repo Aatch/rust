@@ -17,6 +17,7 @@ use codemap::span;
 use parse;
 use opt_vec;
 use opt_vec::OptVec;
+use ast_util::NO_GENERICS;
 
 pub enum FnKind<'self> {
     // fn foo() or extern "Abi" fn foo()
@@ -31,11 +32,6 @@ pub enum FnKind<'self> {
     // |x, y| ...
     FnKindBlock,
 }
-
-static NO_GENERICS : Generics = Generics {
-    lifetimes: opt_vec::Empty,
-    ty_params: opt_vec::Empty,
-};
 
 impl<'self> FnKind<'self> {
     pub fn name(&self) -> ident {
@@ -383,15 +379,6 @@ pub trait Visitor {
 
     pub fn visit_struct_field_contents(&mut self, sf: &struct_field) {
         self.visit_ty(&sf.node.ty)
-    }
-
-    pub fn visit_struct_method(&mut self, m: &method) {
-        self.visit_struct_method_contents(m)
-    }
-
-    pub fn visit_struct_method_contents(&mut self, m: &method) {
-        let fk = FnKindMethod(&m.ident, &m.generics, m);
-        self.visit_fn(&fk, &m.decl, &m.body, m.span, m.id);
     }
 
     pub fn visit_block(&mut self, b: &blk) {

@@ -702,7 +702,7 @@ impl AstBuilder for @ExtCtxt {
             name,
             inputs,
             output,
-            ast_util::empty_generics(),
+            ast_util::NO_GENERICS,
             body)
     }
 
@@ -730,8 +730,7 @@ impl AstBuilder for @ExtCtxt {
 
     fn item_enum(&self, span: span, name: ident,
                  enum_definition: ast::enum_def) -> @ast::item {
-        self.item_enum_poly(span, name, enum_definition,
-                            ast_util::empty_generics())
+        self.item_enum_poly(span, name, enum_definition, ast_util::NO_GENERICS)
     }
 
     fn item_struct(
@@ -744,8 +743,7 @@ impl AstBuilder for @ExtCtxt {
             span,
             name,
             struct_def,
-            ast_util::empty_generics()
-        )
+            ast_util::NO_GENERICS)
     }
 
     fn item_struct_poly(
@@ -779,7 +777,7 @@ impl AstBuilder for @ExtCtxt {
     }
 
     fn item_ty(&self, span: span, name: ident, ty: @ast::Ty) -> @ast::item {
-        self.item_ty_poly(span, name, ty, ast_util::empty_generics())
+        self.item_ty_poly(span, name, ty, ast_util::NO_GENERICS)
     }
 
     fn attribute(&self, sp: span, mi: @ast::meta_item) -> ast::attribute {

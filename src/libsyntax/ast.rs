@@ -640,29 +640,11 @@ pub enum trait_method {
 #[deriving(Eq, Encodable, Decodable,IterBytes)]
 pub enum int_ty { ty_i, ty_char, ty_i8, ty_i16, ty_i32, ty_i64, }
 
-impl ToStr for int_ty {
-    fn to_str(&self) -> ~str {
-        ::ast_util::int_ty_to_str(*self)
-    }
-}
-
 #[deriving(Eq, Encodable, Decodable,IterBytes)]
 pub enum uint_ty { ty_u, ty_u8, ty_u16, ty_u32, ty_u64, }
 
-impl ToStr for uint_ty {
-    fn to_str(&self) -> ~str {
-        ::ast_util::uint_ty_to_str(*self)
-    }
-}
-
 #[deriving(Eq, Encodable, Decodable,IterBytes)]
 pub enum float_ty { ty_f, ty_f32, ty_f64, }
-
-impl ToStr for float_ty {
-    fn to_str(&self) -> ~str {
-        ::ast_util::float_ty_to_str(*self)
-    }
-}
 
 // NB Eq method appears below.
 #[deriving(Eq, Encodable, Decodable,IterBytes)]

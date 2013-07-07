@@ -78,15 +78,15 @@ pub static try_resolve_tvar_shallow: uint = 0;
 pub static resolve_and_force_all_but_regions: uint =
     (resolve_all | force_all) & not_regions;
 
-pub struct ResolveState {
-    infcx: @mut InferCtxt,
+pub struct ResolveState<'self> {
+    infcx: @mut InferCtxt<'self>,
     modes: uint,
     err: Option<fixup_err>,
     v_seen: ~[TyVid],
     type_depth: uint
 }
 
-pub fn resolver(infcx: @mut InferCtxt, modes: uint) -> ResolveState {
+pub fn resolver<'r>(infcx: @mut InferCtxt<'r>, modes: uint) -> ResolveState<'r> {
     ResolveState {
         infcx: infcx,
         modes: modes,
@@ -96,7 +96,7 @@ pub fn resolver(infcx: @mut InferCtxt, modes: uint) -> ResolveState {
     }
 }
 
-impl ResolveState {
+impl<'self> ResolveState<'self> {
     pub fn should(&mut self, mode: uint) -> bool {
         (self.modes & mode) == mode
     }

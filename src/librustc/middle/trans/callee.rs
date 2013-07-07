@@ -72,12 +72,12 @@ pub enum CalleeData {
     Method(MethodData)
 }
 
-pub struct Callee {
-    bcx: block,
+pub struct Callee<'self> {
+    bcx: block<'self>,
     data: CalleeData
 }
 
-pub fn trans(bcx: block, expr: @ast::expr) -> Callee {
+pub fn trans<'r>(bcx: block<'r>, expr: @ast::expr) -> Callee<'r> {
     let _icx = push_ctxt("trans_callee");
     debug!("callee::trans(expr=%s)", expr.repr(bcx.tcx()));
 

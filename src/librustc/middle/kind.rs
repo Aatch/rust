@@ -53,8 +53,8 @@ use syntax::{visit, ast_util};
 
 pub static try_adding: &'static str = "Try adding a move";
 
-pub struct Context {
-    tcx: ty::ctxt,
+pub struct Context<'self> {
+    tcx: ty::ctxt<'self>,
     method_map: typeck::method_map,
     current_item: node_id
 }

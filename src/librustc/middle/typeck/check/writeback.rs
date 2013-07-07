@@ -207,15 +207,15 @@ fn maybe_resolve_type_vars_for_node(wbcx: @mut WbCtxt,
     }
 }
 
-struct WbCtxt {
-    fcx: @mut FnCtxt,
+struct WbCtxt<'self> {
+    fcx: @mut FnCtxt<'self>,
 
     // As soon as we hit an error we have to stop resolving
     // the entire function.
     success: bool,
 }
 
-type wb_vt = visit::vt<@mut WbCtxt>;
+type wb_vt<'self> = visit::vt<@mut WbCtxt<'self>>;
 
 fn visit_stmt(s: @ast::stmt, (wbcx, v): (@mut WbCtxt, wb_vt)) {
     if !wbcx.success { return; }

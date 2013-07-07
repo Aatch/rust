@@ -49,7 +49,7 @@ pub mod gather_loans;
 pub mod move_data;
 
 pub struct LoanDataFlowOperator;
-pub type LoanDataFlow = DataFlowContext<LoanDataFlowOperator>;
+pub type LoanDataFlow<'self> = DataFlowContext<'self, LoanDataFlowOperator>;
 
 pub fn check_crate(
     tcx: ty::ctxt,
@@ -154,8 +154,8 @@ fn borrowck_fn(fk: &visit::fn_kind,
 // ----------------------------------------------------------------------
 // Type definitions
 
-pub struct BorrowckCtxt {
-    tcx: ty::ctxt,
+pub struct BorrowckCtxt<'self> {
+    tcx: ty::ctxt<'self>,
     method_map: typeck::method_map,
     moves_map: moves::MovesMap,
     moved_variables_set: moves::MovedVariablesSet,
@@ -426,7 +426,7 @@ pub enum MovedValueUseKind {
 ///////////////////////////////////////////////////////////////////////////
 // Misc
 
-impl BorrowckCtxt {
+impl<'self> BorrowckCtxt<'self> {
     pub fn is_subregion_of(&self, r_sub: ty::Region, r_sup: ty::Region)
                            -> bool {
         self.tcx.region_maps.is_subregion_of(r_sub, r_sup)

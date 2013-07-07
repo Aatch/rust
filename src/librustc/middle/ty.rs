@@ -228,9 +228,9 @@ pub struct ProvidedMethodSource {
     impl_id: ast::def_id
 }
 
-pub type ctxt = @ctxt_;
+pub type ctxt<'self> = @ctxt_<'self>;
 
-struct ctxt_ {
+struct ctxt_<'self> {
     diag: @syntax::diagnostic::span_handler,
     interner: @mut HashMap<intern_key, ~t_box_>,
     next_id: @mut uint,
@@ -266,7 +266,7 @@ struct ctxt_ {
     trait_refs: @mut HashMap<node_id, @TraitRef>,
     trait_defs: @mut HashMap<def_id, @TraitDef>,
 
-    items: ast_map::Map,
+    items: &'self ast_map::Map<'self>,
     intrinsic_defs: @mut HashMap<ast::def_id, t>,
     freevars: freevars::freevar_map,
     tcache: type_cache,

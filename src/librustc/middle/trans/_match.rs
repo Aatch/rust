@@ -252,10 +252,10 @@ pub fn opt_eq(tcx: ty::ctxt, a: &Opt, b: &Opt) -> bool {
     }
 }
 
-pub enum opt_result {
-    single_result(Result),
-    lower_bound(Result),
-    range_result(Result, Result),
+pub enum opt_result<'self> {
+    single_result(Result<'self>),
+    lower_bound(Result<'self>),
+    range_result(Result<'self>, Result<'self>),
 }
 pub fn trans_opt(bcx: block, o: &Opt) -> opt_result {
     let _icx = push_ctxt("match::trans_opt");
@@ -338,7 +338,7 @@ pub struct BindingInfo {
 pub type BindingsMap = HashMap<ident, BindingInfo>;
 
 pub struct ArmData<'self> {
-    bodycx: block,
+    bodycx: block<'self>,
     arm: &'self ast::arm,
     bindings_map: BindingsMap
 }
@@ -859,9 +859,9 @@ pub fn get_options(bcx: block, m: &[@Match], col: uint) -> ~[Opt] {
     return found;
 }
 
-pub struct ExtractedBlock {
+pub struct ExtractedBlock<'self> {
     vals: ~[ValueRef],
-    bcx: block
+    bcx: block<'self>
 }
 
 pub fn extract_variant_args(bcx: block,

@@ -46,12 +46,12 @@ use syntax::ast;
 use syntax::codemap::span;
 use syntax::visit;
 
-pub struct Rcx {
-    fcx: @mut FnCtxt,
+pub struct Rcx<'self> {
+    fcx: @mut FnCtxt<'self>,
     errors_reported: uint
 }
 
-pub type rvt = visit::vt<@mut Rcx>;
+pub type rvt<'self> = visit::vt<@mut Rcx<'self>>;
 
 fn encl_region_of_def(fcx: @mut FnCtxt, def: ast::def) -> ty::Region {
     let tcx = fcx.tcx();
@@ -73,7 +73,7 @@ fn encl_region_of_def(fcx: @mut FnCtxt, def: ast::def) -> ty::Region {
     }
 }
 
-impl Rcx {
+impl<'self> Rcx<'self> {
     pub fn tcx(&self) -> ty::ctxt {
         self.fcx.ccx.tcx
     }

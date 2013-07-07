@@ -72,8 +72,8 @@ pub type ures = cres<()>; // "unify result"
 pub type fres<T> = Result<T, fixup_err>; // "fixup result"
 pub type CoerceResult = cres<Option<@ty::AutoAdjustment>>;
 
-pub struct InferCtxt {
-    tcx: ty::ctxt,
+pub struct InferCtxt<'self> {
+    tcx: ty::ctxt<'self>,
 
     // We instantiate ValsAndBindings with bounds<ty::t> because the
     // types that might instantiate a general type variable have an
@@ -90,7 +90,7 @@ pub struct InferCtxt {
     float_var_counter: uint,
 
     // For region variables.
-    region_vars: RegionVarBindings,
+    region_vars: RegionVarBindings<'self>,
 }
 
 /// Why did we require that the two types be related?
@@ -496,7 +496,7 @@ struct Snapshot {
     region_vars_snapshot: uint,
 }
 
-impl InferCtxt {
+impl<'self> InferCtxt<'self> {
     pub fn combine_fields(@mut self,
                           a_is_expected: bool,
                           trace: TypeTrace)
@@ -594,7 +594,7 @@ fn next_simple_var<V:Copy,T:Copy>(
     return id;
 }
 
-impl InferCtxt {
+impl<'self> InferCtxt<'self> {
     pub fn next_ty_var_id(&mut self) -> TyVid {
         let id = self.ty_var_counter;
         self.ty_var_counter += 1;

@@ -83,9 +83,9 @@ use syntax::ast;
 // Note: Coerce is not actually a combiner, in that it does not
 // conform to the same interface, though it performs a similar
 // function.
-pub struct Coerce(CombineFields);
+pub struct Coerce<'self>(CombineFields<'self>);
 
-impl Coerce {
+impl<'self> Coerce<'self> {
     pub fn tys(&self, a: ty::t, b: ty::t) -> CoerceResult {
         debug!("Coerce.tys(%s => %s)",
                a.inf_str(self.infcx),

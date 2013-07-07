@@ -176,8 +176,8 @@ pub struct MoveMaps {
     capture_map: CaptureMap
 }
 
-struct VisitContext {
-    tcx: ty::ctxt,
+struct VisitContext<'self> {
+    tcx: ty::ctxt<'self>,
     method_map: method_map,
     move_maps: MoveMaps
 }
@@ -230,7 +230,7 @@ fn compute_modes_for_expr(expr: @expr,
     cx.consume_expr(expr, v);
 }
 
-impl VisitContext {
+impl<'self> VisitContext<'self> {
     pub fn consume_exprs(&self, exprs: &[@expr], visitor: vt<VisitContext>) {
         for exprs.iter().advance |expr| {
             self.consume_expr(*expr, visitor);

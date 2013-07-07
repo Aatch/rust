@@ -39,13 +39,13 @@ pub fn compute_restrictions(bccx: @BorrowckCtxt,
 ///////////////////////////////////////////////////////////////////////////
 // Private
 
-struct RestrictionsContext {
-    bccx: @BorrowckCtxt,
+struct RestrictionsContext<'self> {
+    bccx: @BorrowckCtxt<'self>,
     span: span,
     cmt_original: mc::cmt
 }
 
-impl RestrictionsContext {
+impl<'self> RestrictionsContext<'self> {
     fn tcx(&self) -> ty::ctxt {
         self.bccx.tcx
     }

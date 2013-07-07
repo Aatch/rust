@@ -195,13 +195,13 @@ pub fn check_expr(sess: Session,
 // Make sure a const item doesn't recursively refer to itself
 // FIXME: Should use the dependency graph when it's available (#1356)
 pub fn check_item_recursion(sess: Session,
-                            ast_map: ast_map::Map,
+                            ast_map: &ast_map::Map,
                             def_map: resolve::DefMap,
                             it: @item) {
-    struct env {
+    struct env<'self> {
         root_it: @item,
         sess: Session,
-        ast_map: ast_map::Map,
+        ast_map: &'self ast_map::Map<'self>,
         def_map: resolve::DefMap,
         idstack: @mut ~[node_id]
     }

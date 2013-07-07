@@ -510,9 +510,9 @@ pub struct region_dep {
     id: ast::node_id
 }
 
-pub struct DetermineRpCtxt {
+pub struct DetermineRpCtxt<'self> {
     sess: Session,
-    ast_map: ast_map::Map,
+    ast_map: &'self ast_map::Map<'self>,
     def_map: resolve::DefMap,
     region_paramd_items: region_paramd_items,
     dep_map: @mut HashMap<ast::node_id, @mut ~[region_dep]>,
@@ -563,7 +563,7 @@ pub fn add_variance(ambient_variance: region_variance,
     }
 }
 
-impl DetermineRpCtxt {
+impl<'self> DetermineRpCtxt<'self> {
     pub fn add_variance(&self, variance: region_variance) -> region_variance {
         add_variance(self.ambient_variance, variance)
     }

@@ -31,9 +31,9 @@ use util::ppaux::mt_to_str;
 
 use extra::list;
 
-pub struct Glb(CombineFields);  // "greatest lower bound" (common subtype)
+pub struct Glb<'self>(CombineFields<'self>);  // "greatest lower bound" (common subtype)
 
-impl Combine for Glb {
+impl<'self> Combine for Glb<'self> {
     fn infcx(&self) -> @mut InferCtxt { self.infcx }
     fn tag(&self) -> ~str { ~"glb" }
     fn a_is_expected(&self) -> bool { self.a_is_expected }

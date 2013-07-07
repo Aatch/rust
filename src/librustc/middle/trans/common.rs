@@ -162,7 +162,7 @@ impl Repr for @param_substs {
 
 // Function context.  Every LLVM function we create will have one of
 // these.
-pub struct fn_ctxt_ {
+pub struct fn_ctxt_<'self> {
     // The ValueRef returned from a call to llvm::LLVMAddFunction; the
     // address of the first instruction in the sequence of
     // instructions for this function that will go in the .text
@@ -232,10 +232,10 @@ pub struct fn_ctxt_ {
     path: path,
 
     // This function's enclosing crate context.
-    ccx: @mut CrateContext
+    ccx: @mut CrateContext<'self>
 }
 
-impl fn_ctxt_ {
+impl<'self> fn_ctxt_<'self> {
     pub fn arg_pos(&self, arg: uint) -> uint {
         if self.has_immediate_return_value {
             arg + 1u
@@ -259,7 +259,7 @@ impl fn_ctxt_ {
 
 }
 
-pub type fn_ctxt = @mut fn_ctxt_;
+pub type fn_ctxt<'self> = @mut fn_ctxt_<'self>;
 
 pub fn warn_not_to_commit(ccx: &mut CrateContext, msg: &str) {
     if !ccx.do_not_commit_warning_issued {
@@ -436,9 +436,8 @@ pub fn block_cleanups(bcx: block) -> ~[cleanup] {
     }
 }
 
-pub struct scope_info {
-    parent: Option<@mut scope_info>,
-    loop_break: Option<block>,
+pub struct scope_info<'self> {
+    loop_break: Option<block<'self>>,
     loop_label: Option<ident>,
     // A list of functions that must be run at when leaving this
     // block, cleaning up any variables that were introduced in the
@@ -453,7 +452,7 @@ pub struct scope_info {
     node_info: Option<NodeInfo>,
 }
 
-impl scope_info {
+impl<'self> scope_info<'self> {
     pub fn empty_cleanups(&mut self) -> bool {
         self.cleanups.is_empty()
     }
@@ -496,7 +495,7 @@ pub struct NodeInfo {
 // code.  Each basic block we generate is attached to a function, typically
 // with many basic blocks per function.  All the basic blocks attached to a
 // function are organized as a directed graph.
-pub struct block_ {
+pub struct block_<'self> {
     // The BasicBlockRef returned from a call to
     // llvm::LLVMAppendBasicBlock(llfn, name), which adds a basic
     // block to the function pointed to by llfn.  We insert
@@ -505,21 +504,20 @@ pub struct block_ {
     llbb: BasicBlockRef,
     terminated: bool,
     unreachable: bool,
-    parent: Option<block>,
-    // The current scope within this basic block
-    scope: Option<@mut scope_info>,
+    scope: Option<@mut scope_info<'self>>,
+    parent: Option<block<'self>>,
     // Is this block part of a landing pad?
     is_lpad: bool,
     // info about the AST node this block originated from, if any
     node_info: Option<NodeInfo>,
     // The function context for the function to which this block is
     // attached.
-    fcx: fn_ctxt
+    fcx: fn_ctxt<'self>
 }
 
-pub fn block_(llbb: BasicBlockRef, parent: Option<block>,
-              is_lpad: bool, node_info: Option<NodeInfo>, fcx: fn_ctxt)
-    -> block_ {
+pub fn block_<'r>(llbb: BasicBlockRef, parent: Option<block>,
+              is_lpad: bool, node_info: Option<NodeInfo>, fcx: fn_ctxt<'r>)
+    -> block_<'r> {
 
     block_ {
         llbb: llbb,
@@ -533,25 +531,25 @@ pub fn block_(llbb: BasicBlockRef, parent: Option<block>,
     }
 }
 
-pub type block = @mut block_;
+pub type block<'self> = @mut block_<'self>;
 
-pub fn mk_block(llbb: BasicBlockRef, parent: Option<block>,
-            is_lpad: bool, node_info: Option<NodeInfo>, fcx: fn_ctxt)
+pub fn mk_block<'r>(llbb: BasicBlockRef, parent: Option<block>,
+            is_lpad: bool, node_info: Option<NodeInfo>, fcx: fn_ctxt<'r>)
     -> block {
     @mut block_(llbb, parent, is_lpad, node_info, fcx)
 }
 
-pub struct Result {
-    bcx: block,
+pub struct Result<'self> {
+    bcx: block<'self>,
     val: ValueRef
 }
 
-pub fn rslt(bcx: block, val: ValueRef) -> Result {
+pub fn rslt<'r>(bcx: block<'r>, val: ValueRef) -> Result<'r> {
     Result {bcx: bcx, val: val}
 }
 
-impl Result {
-    pub fn unpack(&self, bcx: &mut block) -> ValueRef {
+impl<'self> Result<'self> {
+    pub fn unpack(&self, bcx: &mut block<'self>) -> ValueRef {
         *bcx = self.bcx;
         return self.val;
     }
@@ -593,7 +591,7 @@ pub fn in_scope_cx(cx: block, scope_id: Option<ast::node_id>, f: &fn(si: &mut sc
     }
 }
 
-pub fn block_parent(cx: block) -> block {
+pub fn block_parent<'r>(cx: block<'r>) -> block<'r> {
     match cx.parent {
       Some(b) => b,
       None    => cx.sess().bug(fmt!("block_parent called on root block %?",
@@ -603,7 +601,7 @@ pub fn block_parent(cx: block) -> block {
 
 // Accessors
 
-impl block_ {
+impl<'self> block_<'self> {
     pub fn ccx(&self) -> @mut CrateContext { self.fcx.ccx }
     pub fn tcx(&self) -> ty::ctxt { self.fcx.ccx.tcx }
     pub fn sess(&self) -> Session { self.fcx.ccx.sess }

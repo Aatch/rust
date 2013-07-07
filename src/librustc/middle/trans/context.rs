@@ -36,7 +36,7 @@ use middle::trans::common::{mono_id,ExternMap,tydesc_info,BuilderRef_res,Stats};
 
 use middle::trans::base::{decl_crate_map};
 
-pub struct CrateContext {
+pub struct CrateContext<'self> {
      sess: session::Session,
      llmod: ModuleRef,
      llcx: ContextRef,
@@ -94,7 +94,7 @@ pub struct CrateContext {
      type_hashcodes: HashMap<ty::t, @str>,
      type_short_names: HashMap<ty::t, ~str>,
      all_llvm_symbols: HashSet<@str>,
-     tcx: ty::ctxt,
+     tcx: ty::ctxt<'self>,
      maps: astencode::Maps,
      stats: Stats,
      upcalls: @upcall::Upcalls,
@@ -112,7 +112,7 @@ pub struct CrateContext {
      do_not_commit_warning_issued: bool
 }
 
-impl CrateContext {
+impl<'self> CrateContext<'self> {
     pub fn new(sess: session::Session,
                name: &str,
                tcx: ty::ctxt,
@@ -231,7 +231,7 @@ impl CrateContext {
 }
 
 #[unsafe_destructor]
-impl Drop for CrateContext {
+impl<'self> Drop for CrateContext<'self> {
     fn drop(&self) {
         unsafe {
             unset_task_llcx();

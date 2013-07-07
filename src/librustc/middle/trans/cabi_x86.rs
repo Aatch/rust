@@ -17,11 +17,11 @@ use super::machine::*;
 
 use middle::trans::type_::Type;
 
-struct X86_ABIInfo {
-    ccx: @mut CrateContext
+struct X86_ABIInfo<'self> {
+    ccx: @mut CrateContext<'self>
 }
 
-impl ABIInfo for X86_ABIInfo {
+impl<'self> ABIInfo for X86_ABIInfo<'self> {
     fn compute_info(&self,
                     atys: &[Type],
                     rty: Type,

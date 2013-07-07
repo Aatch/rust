@@ -56,14 +56,14 @@ pub struct Maps {
     capture_map: middle::moves::CaptureMap,
 }
 
-struct DecodeContext {
+struct DecodeContext<'self> {
     cdata: @cstore::crate_metadata,
-    tcx: ty::ctxt,
+    tcx: ty::ctxt<'self>,
     maps: Maps
 }
 
-struct ExtendedDecodeContext {
-    dcx: @DecodeContext,
+struct ExtendedDecodeContext<'self> {
+    dcx: @DecodeContext<'self>,
     from_id_range: ast_util::id_range,
     to_id_range: ast_util::id_range
 }
@@ -162,7 +162,7 @@ fn reserve_id_range(sess: Session,
     ast_util::id_range { min: to_id_min, max: to_id_min }
 }
 
-impl ExtendedDecodeContext {
+impl<'self> ExtendedDecodeContext<'self> {
     pub fn tr_id(&self, id: ast::node_id) -> ast::node_id {
         /*!
          * Translates an internal id, meaning a node id that is known

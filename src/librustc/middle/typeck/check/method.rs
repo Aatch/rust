@@ -153,7 +153,7 @@ pub fn lookup(
 }
 
 pub struct LookupContext<'self> {
-    fcx: @mut FnCtxt,
+    fcx: @mut FnCtxt<'self>,
     expr: @ast::expr,
     self_expr: @ast::expr,
     callee_id: node_id,

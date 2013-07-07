@@ -278,8 +278,8 @@ impl ast_node for @ast::pat {
     fn span(&self) -> span { self.span }
 }
 
-pub struct mem_categorization_ctxt {
-    tcx: ty::ctxt,
+pub struct mem_categorization_ctxt<'self> {
+    tcx: ty::ctxt<'self>,
     method_map: typeck::method_map,
 }
 
@@ -330,7 +330,7 @@ impl MutabilityCategory {
     }
 }
 
-impl mem_categorization_ctxt {
+impl<'self> mem_categorization_ctxt<'self> {
     pub fn expr_ty(&self, expr: @ast::expr) -> ty::t {
         ty::expr_ty(self.tcx, expr)
     }

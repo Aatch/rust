@@ -30,8 +30,8 @@ use middle::ty;
 use middle::typeck;
 use util::ppaux::Repr;
 
-pub struct DataFlowContext<O> {
-    priv tcx: ty::ctxt,
+pub struct DataFlowContext<'self, O> {
+    priv tcx: ty::ctxt<'self>,
     priv method_map: typeck::method_map,
 
     /// the data flow operator
@@ -77,7 +77,7 @@ pub trait DataFlowOperator {
 }
 
 struct PropagationContext<'self, O> {
-    dfcx: &'self mut DataFlowContext<O>,
+    dfcx: &'self mut DataFlowContext<'self, O>,
     changed: bool
 }
 
@@ -97,7 +97,7 @@ struct LoopScope<'self> {
     break_bits: ~[uint]
 }
 
-impl<O:DataFlowOperator> DataFlowContext<O> {
+impl<'self, O:DataFlowOperator> DataFlowContext<'self, O> {
     pub fn new(tcx: ty::ctxt,
                method_map: typeck::method_map,
                oper: O,
@@ -294,8 +294,8 @@ impl<O:DataFlowOperator> DataFlowContext<O> {
     }
 }
 
-impl<O:DataFlowOperator+Copy+'static> DataFlowContext<O> {
-//                      ^^^^^^^^^^^^ only needed for pretty printing
+impl<'self, O:DataFlowOperator+Copy+'static> DataFlowContext<'self, O> {
+//                             ^^^^^^^^^^^^ only needed for pretty printing
     pub fn propagate(&mut self, blk: &ast::blk) {
         //! Performs the data flow analysis.
 

@@ -32,9 +32,9 @@ use syntax::visit;
 use util::ppaux::Repr;
 
 struct CheckLoanCtxt<'self> {
-    bccx: @BorrowckCtxt,
-    dfcx_loans: &'self LoanDataFlow,
-    move_data: move_data::FlowedMoveData,
+    bccx: @BorrowckCtxt<'self>,
+    dfcx_loans: &'self LoanDataFlow<'self>,
+    move_data: move_data::FlowedMoveData<'self>,
     all_loans: &'self [Loan],
     reported: @mut HashSet<ast::node_id>,
 }

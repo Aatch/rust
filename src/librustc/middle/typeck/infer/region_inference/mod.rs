@@ -83,8 +83,8 @@ pub enum RegionResolutionError {
 
 type CombineMap = HashMap<TwoRegions, RegionVid>;
 
-pub struct RegionVarBindings {
-    tcx: ty::ctxt,
+pub struct RegionVarBindings<'self> {
+    tcx: ty::ctxt<'self>,
     var_origins: ~[RegionVariableOrigin],
     constraints: HashMap<Constraint, SubregionOrigin>,
     lubs: CombineMap,
@@ -122,7 +122,7 @@ pub fn RegionVarBindings(tcx: ty::ctxt) -> RegionVarBindings {
     }
 }
 
-impl RegionVarBindings {
+impl<'self> RegionVarBindings<'self> {
     pub fn in_snapshot(&self) -> bool {
         self.undo_log.len() > 0
     }
@@ -478,7 +478,7 @@ impl RegionVarBindings {
     }
 }
 
-impl RegionVarBindings {
+impl<'self> RegionVarBindings<'self> {
     fn is_subregion_of(&self, sub: Region, sup: Region) -> bool {
         let rm = self.tcx.region_maps;
         rm.is_subregion_of(sub, sup)
@@ -735,7 +735,7 @@ struct RegionAndOrigin {
     origin: SubregionOrigin,
 }
 
-impl RegionVarBindings {
+impl<'self> RegionVarBindings<'self> {
     fn infer_variable_values(&mut self,
                              errors: &mut OptVec<RegionResolutionError>)
                              -> ~[GraphNodeValue] {

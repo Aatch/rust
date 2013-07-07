@@ -58,7 +58,7 @@ pub trait UnifyInferCtxtMethods {
              -> (V, uint);
 }
 
-impl UnifyInferCtxtMethods for InferCtxt {
+impl<'self> UnifyInferCtxtMethods for InferCtxt<'self> {
     fn get<T:Copy,
            V:Copy + Eq + Vid + UnifyVid<T>>(
            &mut self,
@@ -195,7 +195,7 @@ pub trait InferCtxtMethods {
                     -> ures;
 }
 
-impl InferCtxtMethods for InferCtxt {
+impl<'self> InferCtxtMethods for InferCtxt<'self> {
     fn simple_vars<T:Copy + Eq + InferStr + SimplyUnifiable,
                    V:Copy + Eq + Vid + ToStr + UnifyVid<Option<T>>>(
                    &mut self,

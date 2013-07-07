@@ -185,13 +185,13 @@ impl Repr for vtable_origin {
 
 pub type vtable_map = @mut HashMap<ast::node_id, vtable_res>;
 
-pub struct CrateCtxt {
+pub struct CrateCtxt<'self> {
     // A mapping from method call sites to traits that have that method.
     trait_map: resolve::TraitMap,
     method_map: method_map,
     vtable_map: vtable_map,
     coherence_info: coherence::CoherenceInfo,
-    tcx: ty::ctxt
+    tcx: ty::ctxt<'self>
 }
 
 // Functions that write types into the node type table

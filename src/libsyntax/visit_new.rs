@@ -78,7 +78,7 @@ pub trait Visitor {
 
     pub fn visit_item_contents(&mut self, i: &item) {
         match i.node {
-            item_static(ref t, _, ex) => {
+            item_static(@ref t, _, ex) => {
                 self.visit_ty(t);
                 self.visit_expr(ex);
             }
@@ -95,7 +95,7 @@ pub trait Visitor {
                         self.visit_foreign_item(fi);
                     }
                 }
-            item_ty(ref t, ref params) => {
+            item_ty(@ref t, ref params) => {
                 self.visit_ty(t);
                 self.visit_generics(params);
             }
@@ -103,7 +103,7 @@ pub trait Visitor {
                 self.visit_generics(params);
                 self.visit_enum_def(enum_definition, params);
             }
-            item_impl(ref params, ref traits, ref ty, ref methods) => {
+            item_impl(ref params, ref traits, @ref ty, ref methods) => {
                 self.visit_generics(params);
                 for traits.iter().advance |p| {
                     self.visit_path(&p.path);
@@ -137,7 +137,7 @@ pub trait Visitor {
 
     pub fn visit_local_contents(&mut self, loc: &local) {
         self.visit_pat(loc.node.pat);
-        self.visit_ty(&loc.node.ty);
+        self.visit_ty(loc.node.ty);
 
         match loc.node.init {
             None => (),
@@ -150,7 +150,7 @@ pub trait Visitor {
             match vr.node.kind {
                 tuple_variant_kind(ref args) => {
                     for args.iter().advance |va| {
-                        self.visit_ty(&va.ty);
+                        self.visit_ty(va.ty);
                     }
                 }
                 struct_variant_kind(struct_def) => {
@@ -173,15 +173,15 @@ pub trait Visitor {
             ty_box(ref mt) | ty_uniq(ref mt) | ty_vec(ref mt) |
             ty_ptr(ref mt) | ty_rptr(_, ref mt) => self.visit_ty(mt.ty),
             ty_tup(ref ts) => {
-                for ts.iter().advance |tt| {
+                for ts.iter().advance |&tt| {
                     self.visit_ty(tt);
                 }
             }
             ty_closure(ref f) => {
                 for f.decl.inputs.iter().advance |a| {
-                    self.visit_ty(&a.ty);
+                    self.visit_ty(a.ty);
                 }
-                self.visit_ty(&f.decl.output);
+                self.visit_ty(f.decl.output);
                 match f.bounds {
                     Some(ref bounds) => self.visit_ty_param_bounds(bounds),
                     None => ()
@@ -189,9 +189,9 @@ pub trait Visitor {
             }
             ty_bare_fn(ref f) => {
                 for f.decl.inputs.iter().advance |a| {
-                    self.visit_ty(&a.ty);
+                    self.visit_ty(a.ty);
                 }
-                self.visit_ty(&f.decl.output);
+                self.visit_ty(f.decl.output);
             }
             ty_path(ref p, ref bounds, _) => {
                 self.visit_path(p);
@@ -213,7 +213,7 @@ pub trait Visitor {
     }
 
     pub fn visit_path_contents(&mut self, p: &Path) {
-        for p.types.iter().advance |tp| {
+        for p.types.iter().advance |&tp| {
             self.visit_ty(tp);
         }
     }
@@ -282,7 +282,7 @@ pub trait Visitor {
                 self.visit_fn_decl(fd);
                 self.visit_generics(generics);
             }
-            foreign_item_static(ref t, _) => {
+            foreign_item_static(@ref t, _) => {
                 self.visit_ty(t);
             }
         }
@@ -318,9 +318,9 @@ pub trait Visitor {
     pub fn visit_fn_decl_contents(&mut self, fd: &fn_decl) {
         for fd.inputs.iter().advance |a| {
             self.visit_pat(a.pat);
-            self.visit_ty(&a.ty);
+            self.visit_ty(a.ty);
         }
-        self.visit_ty(&fd.output);
+        self.visit_ty(fd.output);
     }
 
     pub fn visit_fn(&mut self, fk: &FnKind, decl: &fn_decl, body: &blk, sp: span, id: node_id) {
@@ -341,10 +341,10 @@ pub trait Visitor {
 
     pub fn visit_ty_method_contents(&mut self, meth: &ty_method) {
         for meth.decl.inputs.iter().advance |a| {
-            self.visit_ty(&a.ty);
+            self.visit_ty(a.ty);
         }
         self.visit_generics(&meth.generics);
-        self.visit_ty(&meth.decl.output);
+        self.visit_ty(meth.decl.output);
     }
 
     pub fn visit_trait_method(&mut self, m: &trait_method) {
@@ -378,7 +378,7 @@ pub trait Visitor {
     }
 
     pub fn visit_struct_field_contents(&mut self, sf: &struct_field) {
-        self.visit_ty(&sf.node.ty)
+        self.visit_ty(sf.node.ty)
     }
 
     pub fn visit_block(&mut self, b: &blk) {
@@ -464,7 +464,7 @@ pub trait Visitor {
                 for args.iter().advance |&ex| {
                     self.visit_expr(ex);
                 }
-                for tys.iter().advance |tp| {
+                for tys.iter().advance |&tp| {
                     self.visit_ty(tp);
                 }
                 self.visit_expr(callee);
@@ -476,7 +476,7 @@ pub trait Visitor {
             expr_addr_of(_, @ref x) | expr_unary(_, _, @ref x) |
             expr_loop_body(@ref x) | expr_do_body(@ref x) => self.visit_expr(x),
             expr_lit(_) => (),
-            expr_cast(@ref x, ref t) => {
+            expr_cast(@ref x, @ref t) => {
                 self.visit_expr(x);
                 self.visit_ty(t);
             }
@@ -514,7 +514,7 @@ pub trait Visitor {
             }
             expr_field(@ref x, _, ref tys) => {
                 self.visit_expr(x);
-                for tys.iter().advance |tp| {
+                for tys.iter().advance |&tp| {
                     self.visit_ty(tp);
                 }
             }

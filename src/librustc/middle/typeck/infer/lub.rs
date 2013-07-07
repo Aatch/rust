@@ -30,17 +30,17 @@ use syntax::ast::{Many, Once, extern_fn, m_const, impure_fn};
 use syntax::ast::{unsafe_fn};
 use syntax::ast::{Onceness, purity};
 
-pub struct Lub(CombineFields);  // least-upper-bound: common supertype
+pub struct Lub<'self>(CombineFields<'self>);  // least-upper-bound: common supertype
 
-impl Lub {
+impl<'self> Lub<'self> {
     pub fn bot_ty(&self, b: ty::t) -> cres<ty::t> { Ok(b) }
     pub fn ty_bot(&self, b: ty::t) -> cres<ty::t> {
         self.bot_ty(b) // commutative
     }
 }
 
-impl Combine for Lub {
-    fn infcx(&self) -> @mut InferCtxt { self.infcx }
+impl<'self> Combine for Lub<'self> {
+    fn infcx<'r>(&'r self) -> @mut InferCtxt<'r> { self.infcx }
     fn tag(&self) -> ~str { ~"lub" }
     fn a_is_expected(&self) -> bool { self.a_is_expected }
     fn trace(&self) -> TypeTrace { self.trace }

@@ -228,8 +228,8 @@ enum VarKind {
     ImplicitRet
 }
 
-struct IrMaps {
-    tcx: ty::ctxt,
+struct IrMaps<'self> {
+    tcx: ty::ctxt<'self>,
     method_map: typeck::method_map,
     capture_map: moves::CaptureMap,
 
@@ -260,7 +260,7 @@ fn IrMaps(tcx: ty::ctxt,
     }
 }
 
-impl IrMaps {
+impl<'self> IrMaps<'self> {
     pub fn add_live_node(&mut self, lnk: LiveNodeKind) -> LiveNode {
         let ln = LiveNode(self.num_live_nodes);
         self.lnks.push(lnk);
@@ -548,9 +548,9 @@ static ACC_USE: uint = 4u;
 
 type LiveNodeMap = @mut HashMap<node_id, LiveNode>;
 
-struct Liveness {
-    tcx: ty::ctxt,
-    ir: @mut IrMaps,
+struct Liveness<'self> {
+    tcx: ty::ctxt<'self>,
+    ir: @mut IrMaps<'self>,
     s: Specials,
     successors: @mut ~[LiveNode],
     users: @mut ~[Users],
@@ -578,7 +578,7 @@ fn Liveness(ir: @mut IrMaps, specials: Specials) -> Liveness {
     }
 }
 
-impl Liveness {
+impl<'self> Liveness<'self> {
     pub fn live_node(&self, node_id: node_id, span: span) -> LiveNode {
         let ir: &mut IrMaps = self.ir;
         match ir.live_node_map.find(&node_id) {
@@ -1497,7 +1497,7 @@ enum ReadKind {
     PartiallyMovedValue
 }
 
-impl Liveness {
+impl<'self> Liveness<'self> {
     pub fn check_ret(&self,
                      id: node_id,
                      sp: span,

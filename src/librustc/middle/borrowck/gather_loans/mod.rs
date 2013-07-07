@@ -63,8 +63,8 @@ mod gather_moves;
 /// No good.  Instead what will happen is that `root_ub` will be set to the
 /// body of the while loop and we will refuse to root the pointer `&*x`
 /// because it would have to be rooted for a region greater than `root_ub`.
-struct GatherLoanCtxt {
-    bccx: @BorrowckCtxt,
+struct GatherLoanCtxt<'self> {
+    bccx: @BorrowckCtxt<'self>,
     id_range: id_range,
     move_data: @mut move_data::MoveData,
     all_loans: @mut ~[Loan],
@@ -281,7 +281,7 @@ fn gather_loans_in_expr(ex: @ast::expr,
     }
 }
 
-impl GatherLoanCtxt {
+impl<'self> GatherLoanCtxt<'self> {
     pub fn tcx(&self) -> ty::ctxt { self.bccx.tcx }
 
     pub fn push_repeating_id(&mut self, id: ast::node_id) {

@@ -18,7 +18,7 @@ use middle::trans::type_::Type;
 use std::libc::c_uint;
 use std::option;
 
-pub trait ABIInfo {
+pub trait ABIInfo<'self> {
     fn compute_info(&self, atys: &[Type], rty: Type, ret_def: bool) -> FnType;
 }
 

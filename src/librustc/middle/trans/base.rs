@@ -143,7 +143,7 @@ fn fcx_has_nonzero_span(fcx: fn_ctxt) -> bool {
 }
 
 struct StatRecorder<'self> {
-    ccx: @mut CrateContext,
+    ccx: @mut CrateContext<'self>,
     name: &'self str,
     start: u64,
     istart: uint,
@@ -361,8 +361,8 @@ pub fn malloc_raw(bcx: block, t: ty::t, heap: heap) -> Result {
     malloc_raw_dyn(bcx, t, heap, size)
 }
 
-pub struct MallocResult {
-    bcx: block,
+pub struct MallocResult<'self> {
+    bcx: block<'self>,
     box: ValueRef,
     body: ValueRef
 }

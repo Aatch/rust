@@ -34,15 +34,15 @@ use syntax::parse::token::special_idents;
 
 use middle::trans::type_::Type;
 
-pub struct Reflector {
+pub struct Reflector<'self> {
     visitor_val: ValueRef,
     visitor_methods: @~[@ty::Method],
-    final_bcx: block,
+    final_bcx: block<'self>,
     tydesc_ty: Type,
-    bcx: block
+    bcx: block<'self>
 }
 
-impl Reflector {
+impl<'self> Reflector<'self> {
     pub fn c_uint(&mut self, u: uint) -> ValueRef {
         C_uint(self.bcx.ccx(), u)
     }

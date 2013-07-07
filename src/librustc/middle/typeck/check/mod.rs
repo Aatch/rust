@@ -156,8 +156,8 @@ pub struct SelfInfo {
 /// Here, the function `foo()` and the closure passed to
 /// `bar()` will each have their own `FnCtxt`, but they will
 /// share the inherited fields.
-pub struct inherited {
-    infcx: @mut infer::InferCtxt,
+pub struct inherited<'self> {
+    infcx: @mut infer::InferCtxt<'self>,
     locals: @mut HashMap<ast::node_id, ty::t>,
 
     // Temporary tables:
@@ -219,7 +219,7 @@ enum AllowOverloadedOperatorsFlag {
     DontAllowOverloadedOperators,
 }
 
-pub struct FnCtxt {
+pub struct FnCtxt<'self> {
     // Number of errors that had been reported when we started
     // checking this function. On exit, if we find that *more* errors
     // have been reported, we will skip regionck and other work that
@@ -253,12 +253,12 @@ pub struct FnCtxt {
 
     in_scope_regions: isr_alist,
 
-    inh: @inherited,
+    inh: @inherited<'self>,
 
-    ccx: @mut CrateCtxt,
+    ccx: @mut CrateCtxt<'self>,
 }
 
-pub fn blank_inherited(ccx: @mut CrateCtxt) -> @inherited {
+pub fn blank_inherited<'r>(ccx: @mut CrateCtxt<'r>) -> @inherited<'r> {
     @inherited {
         infcx: infer::new_infer_ctxt(ccx.tcx),
         locals: @mut HashMap::new(),
@@ -271,10 +271,10 @@ pub fn blank_inherited(ccx: @mut CrateCtxt) -> @inherited {
 }
 
 // Used by check_const and check_enum_variants
-pub fn blank_fn_ctxt(ccx: @mut CrateCtxt,
+pub fn blank_fn_ctxt<'r>(ccx: @mut CrateCtxt<'r>,
                      rty: ty::t,
                      region_bnd: ast::node_id)
-                  -> @mut FnCtxt {
+                  -> @mut FnCtxt<'r> {
 // It's kind of a kludge to manufacture a fake function context
 // and statement context, but we might as well do write the code only once
     @mut FnCtxt {
@@ -647,7 +647,7 @@ pub fn check_item(ccx: @mut CrateCtxt, it: @ast::item) {
     }
 }
 
-impl AstConv for FnCtxt {
+impl<'self> AstConv for FnCtxt<'self> {
     fn tcx(&self) -> ty::ctxt { self.ccx.tcx }
 
     fn get_item_ty(&self, id: ast::def_id) -> ty::ty_param_bounds_and_ty {
@@ -663,7 +663,7 @@ impl AstConv for FnCtxt {
     }
 }
 
-impl FnCtxt {
+impl<'self> FnCtxt<'self> {
     pub fn infcx(&self) -> @mut infer::InferCtxt {
         self.inh.infcx
     }
@@ -698,7 +698,7 @@ impl FnCtxt {
     }
 }
 
-impl region_scope for FnCtxt {
+impl<'self> region_scope for FnCtxt<'self> {
     fn anon_region(&self, span: span) -> Result<ty::Region, RegionError> {
         result::Ok(self.infcx().next_region_var(infer::MiscVariable(span)))
     }
@@ -712,7 +712,7 @@ impl region_scope for FnCtxt {
     }
 }
 
-impl FnCtxt {
+impl<'self> FnCtxt<'self> {
     pub fn tag(&self) -> ~str {
         unsafe {
             fmt!("%x", transmute(self))

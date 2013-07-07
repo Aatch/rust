@@ -30,10 +30,10 @@ use syntax::abi::AbiSet;
 use syntax::ast;
 use syntax::ast::{Onceness, m_const, purity};
 
-pub struct Sub(CombineFields);  // "subtype", "subregion" etc
+pub struct Sub<'self>(CombineFields<'self>);  // "subtype", "subregion" etc
 
-impl Combine for Sub {
-    fn infcx(&self) -> @mut InferCtxt { self.infcx }
+impl<'self> Combine for Sub<'self> {
+    fn infcx<'r>(&'r self) -> @mut InferCtxt<'r> { self.infcx }
     fn tag(&self) -> ~str { ~"sub" }
     fn a_is_expected(&self) -> bool { self.a_is_expected }
     fn trace(&self) -> TypeTrace { self.trace }

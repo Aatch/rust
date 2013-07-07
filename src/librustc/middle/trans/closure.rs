@@ -200,10 +200,10 @@ pub fn allocate_cbox(bcx: block, sigil: ast::Sigil, cdata_ty: ty::t)
     }
 }
 
-pub struct ClosureResult {
+pub struct ClosureResult<'self> {
     llbox: ValueRef, // llvalue of ptr to closure
     cdata_ty: ty::t, // type of the closure data
-    bcx: block       // final bcx
+    bcx: block<'self>       // final bcx
 }
 
 // Given a block context and a list of tydescs and values to bind

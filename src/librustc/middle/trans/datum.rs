@@ -128,8 +128,8 @@ pub struct Datum {
     mode: DatumMode,
 }
 
-pub struct DatumBlock {
-    bcx: block,
+pub struct DatumBlock<'self> {
+    bcx: block<'self>,
     datum: Datum,
 }
 
@@ -812,8 +812,8 @@ impl Datum {
     }
 }
 
-impl DatumBlock {
-    pub fn unpack(&self, bcx: &mut block) -> Datum {
+impl<'self> DatumBlock<'self> {
+    pub fn unpack(&self, bcx: &mut block<'self>) -> Datum {
         *bcx = self.bcx;
         return self.datum;
     }

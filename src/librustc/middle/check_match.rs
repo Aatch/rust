@@ -26,8 +26,8 @@ use syntax::ast_util::{unguarded_pat, walk_pat};
 use syntax::codemap::{span, dummy_sp, spanned};
 use syntax::visit;
 
-pub struct MatchCheckCtxt {
-    tcx: ty::ctxt,
+pub struct MatchCheckCtxt<'self> {
+    tcx: ty::ctxt<'self>,
     method_map: method_map,
     moves_map: moves::MovesMap
 }

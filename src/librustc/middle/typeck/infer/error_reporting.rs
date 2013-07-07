@@ -111,7 +111,7 @@ pub trait ErrorReporting {
 }
 
 
-impl ErrorReporting for InferCtxt {
+impl<'self> ErrorReporting for InferCtxt<'self> {
     pub fn report_region_errors(@mut self,
                                 errors: &OptVec<RegionResolutionError>) {
         for errors.iter().advance |error| {

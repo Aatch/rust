@@ -42,8 +42,8 @@ pub fn guarantee_lifetime(bccx: @BorrowckCtxt,
 ///////////////////////////////////////////////////////////////////////////
 // Private
 
-struct GuaranteeLifetimeContext {
-    bccx: @BorrowckCtxt,
+struct GuaranteeLifetimeContext<'self> {
+    bccx: @BorrowckCtxt<'self>,
 
     // the node id of the function body for the enclosing item
     item_scope_id: ast::node_id,
@@ -58,7 +58,7 @@ struct GuaranteeLifetimeContext {
     cmt_original: mc::cmt
 }
 
-impl GuaranteeLifetimeContext {
+impl<'self> GuaranteeLifetimeContext<'self> {
     fn tcx(&self) -> ty::ctxt {
         self.bccx.tcx
     }

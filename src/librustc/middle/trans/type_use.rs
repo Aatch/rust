@@ -50,13 +50,12 @@ pub static use_repr: uint = 1;   /* Dependency on size/alignment/mode and
                                      take/drop glue */
 pub static use_tydesc: uint = 2; /* Takes the tydesc, or compares */
 
-pub struct Context {
-    ccx: @mut CrateContext,
+pub struct Context<'self> {
+    ccx: @mut CrateContext<'self>,
     uses: @mut ~[type_uses]
 }
 
-pub fn type_uses_for(ccx: @mut CrateContext, fn_id: def_id, n_tps: uint)
-    -> @~[type_uses] {
+pub fn type_uses_for(ccx: @mut CrateContext, fn_id: def_id, n_tps: uint) -> @~[type_uses] {
     match ccx.type_use_cache.find(&fn_id) {
       Some(uses) => return *uses,
       None => ()

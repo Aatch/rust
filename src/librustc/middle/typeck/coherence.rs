@@ -186,9 +186,9 @@ pub fn CoherenceChecker(crate_context: @mut CrateCtxt) -> CoherenceChecker {
     }
 }
 
-pub struct CoherenceChecker {
-    crate_context: @mut CrateCtxt,
-    inference_context: @mut InferCtxt,
+pub struct CoherenceChecker<'self> {
+    crate_context: @mut CrateCtxt<'self>,
+    inference_context: @mut InferCtxt<'self>,
 
     // A mapping from implementations to the corresponding base type
     // definition ID.
@@ -196,7 +196,7 @@ pub struct CoherenceChecker {
     base_type_def_ids: @mut HashMap<def_id,def_id>,
 }
 
-impl CoherenceChecker {
+impl<'self> CoherenceChecker<'self> {
     pub fn check_coherence(self, crate: &crate) {
         // Check implementations and traits. This populates the tables
         // containing the inherent methods and extension methods. It also

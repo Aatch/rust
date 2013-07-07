@@ -308,13 +308,13 @@ pub fn get_lint_dict() -> LintDict {
     return map;
 }
 
-struct Context {
+struct Context<'self> {
     // All known lint modes (string versions)
     dict: @LintDict,
     // Current levels of each lint warning
     curr: SmallIntMap<(level, LintSource)>,
     // context we're checking in (used to access fields like sess)
-    tcx: ty::ctxt,
+    tcx: ty::ctxt<'self>,
     // Just a simple flag if we're currently recursing into a trait
     // implementation. This is only used by the lint_missing_doc() pass
     in_trait_impl: bool,
@@ -339,10 +339,10 @@ struct Context {
     // element. This means that when visiting a node, the original recursive
     // call can used the original visitor's method, although the recursing
     // visitor supplied to the method is the item stopping visitor.
-    visitors: ~[(visit::vt<@mut Context>, visit::vt<@mut Context>)],
+    visitors: ~[(visit::vt<@mut Context<'self>>, visit::vt<@mut Context<'self>>)],
 }
 
-impl Context {
+impl<'self> Context<'self> {
     fn get_level(&self, lint: lint) -> level {
         match self.curr.find(&(lint as uint)) {
           Some(&(lvl, _)) => lvl,

@@ -88,7 +88,7 @@ pub trait ToTy {
              -> ty::t;
 }
 
-impl ToTy for CrateCtxt {
+impl<'self> ToTy for CrateCtxt<'self> {
     fn to_ty<RS:region_scope + Copy + 'static>(
              &self,
              rs: &RS,
@@ -98,7 +98,7 @@ impl ToTy for CrateCtxt {
     }
 }
 
-impl AstConv for CrateCtxt {
+impl<'self> AstConv for CrateCtxt<'self> {
     fn tcx(&self) -> ty::ctxt { self.tcx }
 
     fn get_item_ty(&self, id: ast::def_id) -> ty::ty_param_bounds_and_ty {

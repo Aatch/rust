@@ -52,19 +52,19 @@ pub struct MoveData {
     assignee_ids: HashSet<ast::node_id>,
 }
 
-pub struct FlowedMoveData {
+pub struct FlowedMoveData<'self> {
     move_data: @mut MoveData,
     //         ^~~~~~~~~~~~~
     // It makes me sad to use @mut here, except that due to
     // the visitor design, this is what gather_loans
     // must produce.
 
-    dfcx_moves: MoveDataFlow,
+    dfcx_moves: MoveDataFlow<'self>,
 
     // We could (and maybe should, for efficiency) combine both move
     // and assign data flow into one, but this way it's easier to
     // distinguish the bits that correspond to moves and assignments.
-    dfcx_assign: AssignDataFlow
+    dfcx_assign: AssignDataFlow<'self>
 }
 
 /// Index into `MoveData.paths`, used like a pointer
@@ -133,10 +133,10 @@ pub struct Assignment {
 }
 
 pub struct MoveDataFlowOperator;
-pub type MoveDataFlow = DataFlowContext<MoveDataFlowOperator>;
+pub type MoveDataFlow<'self> = DataFlowContext<'self, MoveDataFlowOperator>;
 
 pub struct AssignDataFlowOperator;
-pub type AssignDataFlow = DataFlowContext<AssignDataFlowOperator>;
+pub type AssignDataFlow<'self> = DataFlowContext<'self, AssignDataFlowOperator>;
 
 impl MoveData {
     pub fn new() -> MoveData {
@@ -444,7 +444,7 @@ impl MoveData {
     }
 }
 
-impl FlowedMoveData {
+impl<'self> FlowedMoveData<'self> {
     pub fn new(move_data: @mut MoveData,
                tcx: ty::ctxt,
                method_map: typeck::method_map,

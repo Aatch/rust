@@ -305,7 +305,7 @@ fn check_main_fn_ty(ccx: &CrateCtxt,
     match ty::get(main_t).sty {
         ty::ty_bare_fn(ref fn_ty) => {
             match tcx.items.find(&main_id) {
-                Some(&ast_map::node_item(it,_)) => {
+                Some(&ast_map::NodeItem(it,_)) => {
                     match it.node {
                         ast::item_fn(_, _, _, ref ps, _)
                         if ps.is_parameterized() => {
@@ -346,7 +346,7 @@ fn check_start_fn_ty(ccx: &CrateCtxt,
     match ty::get(start_t).sty {
         ty::ty_bare_fn(_) => {
             match tcx.items.find(&start_id) {
-                Some(&ast_map::node_item(it,_)) => {
+                Some(&ast_map::NodeItem(it,_)) => {
                     match it.node {
                         ast::item_fn(_,_,_,ref ps,_)
                         if ps.is_parameterized() => {

@@ -732,7 +732,7 @@ impl<'self, O:DataFlowOperator> PropagationContext<'self, O> {
                 self.walk_exprs(*exprs, in_out, loop_scopes);
             }
 
-            ast::expr_binary(_, op, l, r) if ast_util::lazy_binop(op) => {
+            ast::expr_binary(_, op, l, r) if op.is_lazy() => {
                 self.walk_expr(l, in_out, loop_scopes);
                 let temp = reslice(in_out).to_owned();
                 self.walk_expr(r, in_out, loop_scopes);

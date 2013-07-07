@@ -1528,7 +1528,7 @@ pub fn check_expr_with_unifier(fcx: @mut FnCtxt,
         let lhs_t = structurally_resolved_type(fcx, lhs.span,
                                                fcx.expr_ty(lhs));
 
-        if ty::type_is_integral(lhs_t) && ast_util::is_shift_binop(op) {
+        if ty::type_is_integral(lhs_t) && op.is_shift() {
             // Shift is a special case: rhs can be any integral type
             check_expr(fcx, rhs);
             let rhs_t = fcx.expr_ty(rhs);
@@ -1561,10 +1561,9 @@ pub fn check_expr_with_unifier(fcx: @mut FnCtxt,
             // type
             fcx.write_error(expr.id);
             fcx.write_error(rhs.id);
-            fcx.type_error_message(expr.span, |actual| {
+            fcx.type_error_message(expr.span, |actual|
                 fmt!("binary operation %s cannot be applied \
-                      to type `%s`",
-                     ast_util::binop_to_str(op), actual)},
+                      to type `%s`", op.as_str(), actual),
                                    lhs_t, None)
 
         }
@@ -1582,12 +1581,9 @@ pub fn check_expr_with_unifier(fcx: @mut FnCtxt,
                                         expected_result);
         } else {
             fcx.type_error_message(expr.span,
-                                   |actual| {
-                                        fmt!("binary operation %s cannot be \
-                                              applied to type `%s`",
-                                             ast_util::binop_to_str(op),
-                                             actual)
-                                   },
+                                   |actual| fmt!("binary operation %s cannot be \
+                                              applied to type `%s`", op.as_str(),
+                                             actual),
                                    lhs_t,
                                    None);
             result_t = ty::mk_err();
@@ -1608,13 +1604,12 @@ pub fn check_expr_with_unifier(fcx: @mut FnCtxt,
                         rhs: @ast::expr,
                        expected_result: Option<ty::t>) -> ty::t {
         let tcx = fcx.ccx.tcx;
-        match ast_util::binop_to_method_name(op) {
-            Some(ref name) => {
+        match op.method_name() {
+            Some(name) => {
                 let if_op_unbound = || {
-                    fcx.type_error_message(ex.span, |actual| {
+                    fcx.type_error_message(ex.span, |actual|
                         fmt!("binary operation %s cannot be applied \
-                              to type `%s`",
-                             ast_util::binop_to_str(op), actual)},
+                              to type `%s`", op.as_str(), actual),
                             lhs_resolved_t, None)
                 };
                 return lookup_op_method(fcx, callee_id, ex, lhs_expr, lhs_resolved_t,
@@ -1954,7 +1949,7 @@ pub fn check_expr_with_unifier(fcx: @mut FnCtxt,
                 tcx.region_paramd_items.find(&class_id.node).
                     map_consume(|x| *x);
             match tcx.items.find(&class_id.node) {
-                Some(&ast_map::node_item(@ast::item {
+                Some(&ast_map::NodeItem(&ast::item {
                         node: ast::item_struct(_, ref generics),
                         _
                     }, _)) => {
@@ -2042,7 +2037,7 @@ pub fn check_expr_with_unifier(fcx: @mut FnCtxt,
             region_parameterized =
                 tcx.region_paramd_items.find(&enum_id.node).map_consume(|x| *x);
             match tcx.items.find(&enum_id.node) {
-                Some(&ast_map::node_item(@ast::item {
+                Some(&ast_map::NodeItem(&ast::item {
                         node: ast::item_enum(_, ref generics),
                         _
                     }, _)) => {
@@ -2298,7 +2293,7 @@ pub fn check_expr_with_unifier(fcx: @mut FnCtxt,
             fcx.write_error(id);
         }
         else if ty::type_is_bot(lhs_ty) ||
-          (ty::type_is_bot(rhs_ty) && !ast_util::lazy_binop(op)) {
+          (ty::type_is_bot(rhs_ty) && !op.is_lazy()) {
             fcx.write_bot(id);
         }
       }

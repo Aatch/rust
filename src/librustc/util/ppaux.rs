@@ -71,13 +71,13 @@ pub fn explain_region_and_span(cx: ctxt, region: ty::Region)
     return match region {
       re_scope(node_id) => {
         match cx.items.find(&node_id) {
-          Some(&ast_map::node_block(ref blk)) => {
+          Some(&ast_map::NodeBlock(ref blk)) => {
             explain_span(cx, "block", blk.span)
           }
-          Some(&ast_map::node_callee_scope(expr)) => {
+          Some(&ast_map::NodeCalleeScope(expr)) => {
               explain_span(cx, "callee", expr.span)
           }
-          Some(&ast_map::node_expr(expr)) => {
+          Some(&ast_map::NodeExpr(expr)) => {
             match expr.node {
               ast::expr_call(*) => explain_span(cx, "call", expr.span),
               ast::expr_method_call(*) => {
@@ -87,10 +87,10 @@ pub fn explain_region_and_span(cx: ctxt, region: ty::Region)
               _ => explain_span(cx, "expression", expr.span)
             }
           }
-          Some(&ast_map::node_stmt(stmt)) => {
+          Some(&ast_map::NodeStmt(stmt)) => {
               explain_span(cx, "statement", stmt.span)
           }
-          Some(&ast_map::node_item(it, _)) if (match it.node {
+          Some(&ast_map::NodeItem(it, _)) if (match it.node {
                 ast::item_fn(*) => true, _ => false}) => {
               explain_span(cx, "function body", it.span)
           }
@@ -112,7 +112,7 @@ pub fn explain_region_and_span(cx: ctxt, region: ty::Region)
         };
 
         match cx.items.find(&fr.scope_id) {
-          Some(&ast_map::node_block(ref blk)) => {
+          Some(&ast_map::NodeBlock(blk)) => {
             let (msg, opt_span) = explain_span(cx, "block", blk.span);
             (fmt!("%s %s", prefix, msg), opt_span)
           }
@@ -165,11 +165,11 @@ pub fn bound_region_to_str(cx: ctxt,
 
 pub fn re_scope_id_to_str(cx: ctxt, node_id: ast::node_id) -> ~str {
     match cx.items.find(&node_id) {
-      Some(&ast_map::node_block(ref blk)) => {
+      Some(&ast_map::NodeBlock(ref blk)) => {
         fmt!("<block at %s>",
              cx.sess.codemap.span_to_str(blk.span))
       }
-      Some(&ast_map::node_expr(expr)) => {
+      Some(&ast_map::NodeExpr(expr)) => {
         match expr.node {
           ast::expr_call(*) => {
             fmt!("<call at %s>",
@@ -409,11 +409,11 @@ pub fn ty_to_str(cx: ctxt, typ: t) -> ~str {
       ty_bool => ~"bool",
       ty_int(ast::ty_i) => ~"int",
       ty_int(ast::ty_char) => ~"char",
-      ty_int(t) => ast_util::int_ty_to_str(t),
+      ty_int(t) => t.to_str(),
       ty_uint(ast::ty_u) => ~"uint",
-      ty_uint(t) => ast_util::uint_ty_to_str(t),
+      ty_uint(t) => t.to_str(),
       ty_float(ast::ty_f) => ~"float",
-      ty_float(t) => ast_util::float_ty_to_str(t),
+      ty_float(t) => t.to_str(),
       ty_box(ref tm) => ~"@" + mt_to_str(cx, tm),
       ty_uniq(ref tm) => ~"~" + mt_to_str(cx, tm),
       ty_ptr(ref tm) => ~"*" + mt_to_str(cx, tm),
@@ -627,12 +627,12 @@ impl Repr for ast::def_id {
         // and otherwise fallback to just printing the crate/node pair
         if self.crate == ast::local_crate {
             match tcx.items.find(&self.node) {
-                Some(&ast_map::node_item(*)) |
-                Some(&ast_map::node_foreign_item(*)) |
-                Some(&ast_map::node_method(*)) |
-                Some(&ast_map::node_trait_method(*)) |
-                Some(&ast_map::node_variant(*)) |
-                Some(&ast_map::node_struct_ctor(*)) => {
+                Some(&ast_map::NodeItem(*)) |
+                Some(&ast_map::NodeForeignItem(*)) |
+                Some(&ast_map::NodeMethod(*)) |
+                Some(&ast_map::NodeTraitMethod(*)) |
+                Some(&ast_map::NodeVariant(*)) |
+                Some(&ast_map::NodeStructCtor(*)) => {
                     return fmt!("%?:%s", *self, ty::item_path_str(tcx, *self));
                 }
                 _ => {}

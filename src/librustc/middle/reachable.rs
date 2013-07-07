@@ -83,9 +83,9 @@ enum PrivacyContext {
 }
 
 // Information needed while computing reachability.
-struct ReachableContext {
+struct ReachableContext<'self> {
     // The type context.
-    tcx: ty::ctxt,
+    tcx: ty::ctxt<'self>,
     // The method map, which links node IDs of method call expressions to the
     // methods they've been resolved to.
     method_map: typeck::method_map,
@@ -96,7 +96,7 @@ struct ReachableContext {
     worklist: @mut ~[node_id],
 }
 
-impl ReachableContext {
+impl<'self> ReachableContext<'self> {
     // Creates a new reachability computation context.
     fn new(tcx: ty::ctxt, method_map: typeck::method_map)
            -> ReachableContext {
@@ -222,19 +222,19 @@ impl ReachableContext {
 
         let node_id = def_id.node;
         match tcx.items.find(&node_id) {
-            Some(&ast_map::node_item(item, _)) => {
+            Some(&ast_map::NodeItem(item, _)) => {
                 match item.node {
                     item_fn(*) => item_might_be_inlined(item),
                     _ => false,
                 }
             }
-            Some(&ast_map::node_trait_method(trait_method, _, _)) => {
+            Some(&ast_map::NodeTraitMethod(trait_method, _, _)) => {
                 match *trait_method {
                     required(_) => false,
                     provided(_) => true,
                 }
             }
-            Some(&ast_map::node_method(method, impl_did, _)) => {
+            Some(&ast_map::NodeMethod(method, impl_did, _)) => {
                 if generics_require_inlining(&method.generics) ||
                         attributes_specify_inlining(method.attrs) {
                     true
@@ -243,7 +243,7 @@ impl ReachableContext {
                     // impl require inlining, this method does too.
                     assert!(impl_did.crate == local_crate);
                     match tcx.items.find(&impl_did.node) {
-                        Some(&ast_map::node_item(item, _)) => {
+                        Some(&ast_map::NodeItem(item, _)) => {
                             match item.node {
                                 item_impl(ref generics, _, _, _) => {
                                     generics_require_inlining(generics)
@@ -341,7 +341,7 @@ impl ReachableContext {
             // marking all path expressions that resolve to something
             // interesting.
             match self.tcx.items.find(&search_item) {
-                Some(&ast_map::node_item(item, _)) => {
+                Some(&ast_map::NodeItem(item, _)) => {
                     match item.node {
                         item_fn(_, _, _, _, ref search_block) => {
                             visit::visit_block(search_block, ((), visitor))
@@ -353,7 +353,7 @@ impl ReachableContext {
                         }
                     }
                 }
-                Some(&ast_map::node_trait_method(trait_method, _, _)) => {
+                Some(&ast_map::NodeTraitMethod(trait_method, _, _)) => {
                     match *trait_method {
                         required(ref ty_method) => {
                             self.tcx.sess.span_bug(ty_method.span,
@@ -365,7 +365,7 @@ impl ReachableContext {
                         }
                     }
                 }
-                Some(&ast_map::node_method(ref method, _, _)) => {
+                Some(&ast_map::NodeMethod(ref method, _, _)) => {
                     visit::visit_block(&method.body, ((), visitor))
                 }
                 Some(_) => {

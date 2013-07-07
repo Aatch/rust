@@ -31,9 +31,6 @@ use to_str::ToStr;
 use vec::raw::{VecRepr, SliceRepr};
 use vec;
 use vec::{OwnedVector, UnboxedVecRepr};
-#[cfg(stage0)]
-use intrinsic::{Opaque, TyDesc, TyVisitor, get_tydesc, visit_tydesc};
-#[cfg(not(stage0))]
 use unstable::intrinsics::{Opaque, TyDesc, TyVisitor, get_tydesc, visit_tydesc};
 
 #[cfg(test)] use io;

@@ -497,7 +497,7 @@ fn visit_expr(expr: @expr, (this, vt): (@mut IrMaps, vt<@mut IrMaps>)) {
         this.add_live_node_for_node(expr.id, ExprNode(expr.span));
         visit::visit_expr(expr, (this, vt));
       }
-      expr_binary(_, op, _, _) if ast_util::lazy_binop(op) => {
+      expr_binary(_, op, _, _) if op.is_lazy() => {
         this.add_live_node_for_node(expr.id, ExprNode(expr.span));
         visit::visit_expr(expr, (this, vt));
       }
@@ -1182,7 +1182,7 @@ impl Liveness {
             self.propagate_through_exprs(*exprs, succ)
           }
 
-          expr_binary(_, op, l, r) if ast_util::lazy_binop(op) => {
+          expr_binary(_, op, l, r) if op.is_lazy() => {
             let r_succ = self.propagate_through_expr(r, succ);
 
             let ln = self.live_node(expr.id, expr.span);

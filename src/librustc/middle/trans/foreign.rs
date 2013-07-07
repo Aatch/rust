@@ -707,7 +707,7 @@ pub fn trans_intrinsic(ccx: @mut CrateContext,
             let out_type_size = machine::llbitsize_of_real(ccx, llouttype);
             if in_type_size != out_type_size {
                 let sp = match ccx.tcx.items.get_copy(&ref_id.get()) {
-                    ast_map::node_expr(e) => e.span,
+                    ast_map::NodeExpr(e) => e.span,
                     _ => fail!("transmute has non-expr arg"),
                 };
                 let pluralize = |n| if 1u == n { "" } else { "s" };

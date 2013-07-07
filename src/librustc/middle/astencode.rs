@@ -32,7 +32,6 @@ use extra::serialize::{Encoder, Encodable, EncoderHelpers, DecoderHelpers};
 use extra::serialize::{Decoder, Decodable};
 use syntax::ast;
 use syntax::ast_map;
-use syntax::ast_util::inlined_item_utils;
 use syntax::ast_util;
 use syntax::codemap::span;
 use syntax::codemap;

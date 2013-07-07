@@ -512,7 +512,7 @@ pub struct region_dep {
 
 pub struct DetermineRpCtxt {
     sess: Session,
-    ast_map: ast_map::map,
+    ast_map: ast_map::Map,
     def_map: resolve::DefMap,
     region_paramd_items: region_paramd_items,
     dep_map: @mut HashMap<ast::node_id, @mut ~[region_dep]>,
@@ -871,7 +871,7 @@ fn determine_rp_in_struct_field(
 }
 
 pub fn determine_rp_in_crate(sess: Session,
-                             ast_map: ast_map::map,
+                             ast_map: ast_map::Map,
                              def_map: resolve::DefMap,
                              crate: &ast::crate)
                           -> region_paramd_items {

@@ -788,7 +788,7 @@ pub fn cast_shift_rhs(op: ast::binop,
                    -> ValueRef {
     // Shifts may have any size int on the rhs
     unsafe {
-        if ast_util::is_shift_binop(op) {
+        if op.is_shift() {
             let rhs_llty = val_ty(rhs);
             let lhs_llty = val_ty(lhs);
             let rhs_sz = llvm::LLVMGetIntTypeWidth(rhs_llty.to_ref());
@@ -2134,7 +2134,7 @@ pub fn trans_enum_def(ccx: @mut CrateContext, enum_definition: &ast::enum_def,
 pub fn trans_item(ccx: @mut CrateContext, item: &ast::item) {
     let _icx = push_ctxt("trans_item");
     let path = match ccx.tcx.items.get_copy(&item.id) {
-        ast_map::node_item(_, p) => p,
+        ast_map::NodeItem(_, ref p) => p,
         // tjc: ?
         _ => fail!("trans_item"),
     };
@@ -2447,7 +2447,7 @@ pub fn fill_fn_pair(bcx: block, pair: ValueRef, llfn: ValueRef,
 
 pub fn item_path(ccx: &CrateContext, i: &ast::item) -> path {
     let base = match ccx.tcx.items.get_copy(&i.id) {
-        ast_map::node_item(_, p) => p,
+        ast_map::NodeItem(_, ref p) => p,
             // separate map for paths?
         _ => fail!("item_path")
     };
@@ -2463,7 +2463,7 @@ pub fn get_item_val(ccx: @mut CrateContext, id: ast::node_id) -> ValueRef {
         let mut exprt = false;
         let item = ccx.tcx.items.get_copy(&id);
         let val = match item {
-          ast_map::node_item(i, pth) => {
+          ast_map::NodeItem(i, pth) => {
             let my_path = vec::append(/*bad*/copy *pth,
                                       [path_name(i.ident)]);
             match i.node {
@@ -2500,7 +2500,7 @@ pub fn get_item_val(ccx: @mut CrateContext, id: ast::node_id) -> ValueRef {
               _ => fail!("get_item_val: weird result in table")
             }
           }
-          ast_map::node_trait_method(trait_method, _, pth) => {
+          ast_map::NodeTraitMethod(trait_method, _, ref pth) => {
             debug!("get_item_val(): processing a node_trait_method");
             match *trait_method {
               ast::required(_) => {
@@ -2513,10 +2513,10 @@ pub fn get_item_val(ccx: @mut CrateContext, id: ast::node_id) -> ValueRef {
               }
             }
           }
-          ast_map::node_method(m, _, pth) => {
+          ast_map::NodeMethod(m, _, ref pth) => {
             register_method(ccx, id, pth, m)
           }
-          ast_map::node_foreign_item(ni, _, _, pth) => {
+          ast_map::NodeForeignItem(ni, _, _, ref pth) => {
             exprt = true;
             match ni.node {
                 ast::foreign_item_fn(*) => {
@@ -2540,7 +2540,7 @@ pub fn get_item_val(ccx: @mut CrateContext, id: ast::node_id) -> ValueRef {
             }
           }
 
-          ast_map::node_variant(ref v, enm, pth) => {
+          ast_map::NodeVariant(ref v, enm, ref pth) => {
             let llfn;
             match v.node.kind {
                 ast::tuple_variant_kind(ref args) => {
@@ -2563,7 +2563,7 @@ pub fn get_item_val(ccx: @mut CrateContext, id: ast::node_id) -> ValueRef {
             llfn
           }
 
-          ast_map::node_struct_ctor(struct_def, struct_item, struct_path) => {
+          ast_map::NodeStructCtor(struct_def, struct_item, struct_path) => {
             // Only register the constructor if this is a tuple-like struct.
             match struct_def.ctor_id {
                 None => {
@@ -2598,7 +2598,7 @@ pub fn get_item_val(ccx: @mut CrateContext, id: ast::node_id) -> ValueRef {
 
 pub fn register_method(ccx: @mut CrateContext,
                        id: ast::node_id,
-                       path: @ast_map::path,
+                       path: &ast_map::path,
                        m: @ast::method) -> ValueRef {
     let mty = ty::node_id_to_type(ccx.tcx, id);
 

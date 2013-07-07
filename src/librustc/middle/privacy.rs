@@ -27,8 +27,8 @@ use syntax::ast::{item_foreign_mod, item_fn, item_impl, item_struct};
 use syntax::ast::{item_trait, local_crate, node_id, pat_struct, Path};
 use syntax::ast::{private, provided, public, required, stmt_decl, visibility};
 use syntax::ast;
-use syntax::ast_map::{node_foreign_item, node_item, node_method};
-use syntax::ast_map::{node_trait_method};
+use syntax::ast_map::{NodeForeignItem, NodeItem, NodeMethod};
+use syntax::ast_map::{NodeTraitMethod};
 use syntax::ast_map;
 use syntax::ast_util::{Private, Public, is_local};
 use syntax::ast_util::{variant_visibility_to_privacy, visibility_to_privacy};
@@ -112,8 +112,8 @@ pub fn check_crate<'mm>(tcx: ty::ctxt,
             @fn(span: span, method_id: node_id) -> def_id =
             |span, method_id| {
         match tcx.items.find(&method_id) {
-            Some(&node_method(_, impl_id, _)) => impl_id,
-            Some(&node_trait_method(_, trait_id, _)) => trait_id,
+            Some(&NodeMethod(_, impl_id, _)) => impl_id,
+            Some(&NodeTraitMethod(_, trait_id, _)) => trait_id,
             Some(_) => {
                 tcx.sess.span_bug(span,
                                   fmt!("method was a %s?!",
@@ -147,7 +147,7 @@ pub fn check_crate<'mm>(tcx: ty::ctxt,
                 }
 
                 match tcx.items.find(&container_id.node) {
-                    Some(&node_item(item, _)) => {
+                    Some(&NodeItem(item, _)) => {
                         match item.node {
                             item_impl(_, None, _, _)
                                     if item.vis != public => {
@@ -169,10 +169,10 @@ pub fn check_crate<'mm>(tcx: ty::ctxt,
         };
 
         match tcx.items.find(&method_id) {
-            Some(&node_method(method, impl_id, _)) => {
+            Some(&NodeMethod(method, impl_id, _)) => {
                 check(method.vis, impl_id)
             }
-            Some(&node_trait_method(trait_method, trait_id, _)) => {
+            Some(&NodeTraitMethod(trait_method, trait_id, _)) => {
                 match *trait_method {
                     required(_) => check(public, trait_id),
                     provided(method) => check(method.vis, trait_id),
@@ -199,16 +199,16 @@ pub fn check_crate<'mm>(tcx: ty::ctxt,
         let mut f: &fn(node_id) -> bool = |_| false;
         f = |item_id| {
             match tcx.items.find(&item_id) {
-                Some(&node_item(item, _)) => item.vis != public,
-                Some(&node_foreign_item(*)) => false,
-                Some(&node_method(method, impl_did, _)) => {
+                Some(&NodeItem(item, _)) => item.vis != public,
+                Some(&NodeForeignItem(*)) => false,
+                Some(&NodeMethod(method, impl_did, _)) => {
                     match method.vis {
                         private => true,
                         public => false,
                         inherited => f(impl_did.node)
                     }
                 }
-                Some(&node_trait_method(_, trait_did, _)) => f(trait_did.node),
+                Some(&NodeTraitMethod(_, trait_did, _)) => f(trait_did.node),
                 Some(_) => {
                     tcx.sess.span_bug(span,
                                       fmt!("local_item_is_private: item was \
@@ -322,7 +322,7 @@ pub fn check_crate<'mm>(tcx: ty::ctxt,
             method_super(trait_id, method_num) => {
                 if trait_id.crate == local_crate {
                     match tcx.items.find(&trait_id.node) {
-                        Some(&node_item(item, _)) => {
+                        Some(&NodeItem(item, _)) => {
                             match item.node {
                                 item_trait(_, _, ref methods) => {
                                     if method_num >= (*methods).len() {

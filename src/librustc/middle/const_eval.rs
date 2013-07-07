@@ -175,7 +175,7 @@ pub fn lookup_const_by_id(tcx: ty::ctxt,
     if ast_util::is_local(def_id) {
         match tcx.items.find(&def_id.node) {
             None => None,
-            Some(&ast_map::node_item(it, _)) => match it.node {
+            Some(&ast_map::NodeItem(it, _)) => match it.node {
                 item_static(_, ast::m_imm, const_expr) => Some(const_expr),
                 _ => None
             },

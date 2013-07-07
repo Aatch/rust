@@ -57,7 +57,7 @@ pub type encode_inlined_item<'self> = &'self fn(ecx: &EncodeContext,
 
 pub struct EncodeParams<'self> {
     diag: @span_handler,
-    tcx: ty::ctxt,
+    tcx: ty::ctxt<'self>,
     reexports2: middle::resolve::ExportMap2,
     item_symbols: &'self HashMap<ast::node_id, ~str>,
     discrim_symbols: &'self HashMap<ast::node_id, @str>,
@@ -84,7 +84,7 @@ struct Stats {
 
 pub struct EncodeContext<'self> {
     diag: @span_handler,
-    tcx: ty::ctxt,
+    tcx: ty::ctxt<'self>,
     stats: @mut Stats,
     reexports2: middle::resolve::ExportMap2,
     item_symbols: &'self HashMap<ast::node_id, ~str>,
@@ -436,7 +436,7 @@ fn encode_reexported_static_methods(ecx: &EncodeContext,
                                     mod_path: &[ast_map::path_elt],
                                     exp: &middle::resolve::Export2) {
     match ecx.tcx.items.find(&exp.def_id.node) {
-        Some(&ast_map::node_item(item, path)) => {
+        Some(&ast_map::NodeItem(item, path)) => {
             let original_name = ecx.tcx.sess.str_of(item.ident);
 
             //
@@ -1213,7 +1213,7 @@ fn encode_info_for_items(ecx: &EncodeContext,
             |i, (cx, v)| {
                 visit::visit_item(i, (cx, v));
                 match items.get_copy(&i.id) {
-                    ast_map::node_item(_, pt) => {
+                    ast_map::NodeItem(_, ref pt) => {
                         let mut ebml_w = copy ebml_w;
                         // See above
                         let ecx : &EncodeContext = unsafe { cast::transmute(ecx_ptr) };
@@ -1228,7 +1228,7 @@ fn encode_info_for_items(ecx: &EncodeContext,
             |ni, (cx, v)| {
                 visit::visit_foreign_item(ni, (cx, v));
                 match items.get_copy(&ni.id) {
-                    ast_map::node_foreign_item(_, abi, _, pt) => {
+                    ast_map::NodeForeignItem(_, abi, _, ref pt) => {
                         debug!("writing foreign item %s::%s",
                                ast_map::path_to_str(
                                 *pt,

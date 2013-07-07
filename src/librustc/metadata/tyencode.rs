@@ -24,12 +24,12 @@ use syntax::ast::*;
 use syntax::diagnostic::span_handler;
 use syntax::print::pprust::*;
 
-pub struct ctxt {
+pub struct ctxt<'self> {
     diag: @span_handler,
     // Def -> str Callback:
     ds: @fn(def_id) -> ~str,
     // The type context.
-    tcx: ty::ctxt,
+    tcx: ty::ctxt<'self>,
     abbrevs: abbrev_ctxt
 }
 

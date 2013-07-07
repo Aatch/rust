@@ -32,12 +32,12 @@ use sys;
 use sys::size_of;
 use uint;
 use unstable::intrinsics;
-#[cfg(stage0)]
-use intrinsic::{get_tydesc, TyDesc};
+use unstable::intrinsics::{get_tydesc, TyDesc};
 #[cfg(not(stage0))]
-use unstable::intrinsics::{get_tydesc, contains_managed, TyDesc};
+use unstable::intrinsics::{contains_managed};
 use vec;
 use util;
+
 
 extern {
     #[fast_ffi]

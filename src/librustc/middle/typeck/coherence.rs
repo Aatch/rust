@@ -41,7 +41,7 @@ use syntax::ast::{crate, def_id, def_struct, def_ty};
 use syntax::ast::{item, item_enum, item_impl, item_mod, item_struct};
 use syntax::ast::{local_crate, method, trait_ref, ty_path};
 use syntax::ast;
-use syntax::ast_map::node_item;
+use syntax::ast_map::NodeItem;
 use syntax::ast_map;
 use syntax::ast_util::{def_id_of_def, local_def};
 use syntax::codemap::{span, dummy_sp};
@@ -746,7 +746,7 @@ impl CoherenceChecker {
                                     original_type.span,
                                     "resolve didn't resolve this type?!");
                             }
-                            Some(&node_item(item, _)) => {
+                            Some(&NodeItem(item, _)) => {
                                 match item.node {
                                     item_struct(*) | item_enum(*) => true,
                                     _ => false,
@@ -842,7 +842,7 @@ impl CoherenceChecker {
     pub fn span_of_impl(&self, implementation: @Impl) -> span {
         assert_eq!(implementation.did.crate, local_crate);
         match self.crate_context.tcx.items.find(&implementation.did.node) {
-            Some(&node_item(item, _)) => {
+            Some(&NodeItem(item, _)) => {
                 return item.span;
             }
             _ => {
@@ -987,7 +987,7 @@ impl CoherenceChecker {
                     // Destructors only work on nominal types.
                     if impl_info.did.crate == ast::local_crate {
                         match tcx.items.find(&impl_info.did.node) {
-                            Some(&ast_map::node_item(@ref item, _)) => {
+                            Some(&ast_map::NodeItem(@ref item, _)) => {
                                 tcx.sess.span_err((*item).span,
                                                   "the Drop trait may only be implemented on \
                                                    structures");

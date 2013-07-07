@@ -162,7 +162,7 @@ pub fn get_const_val(cx: @mut CrateContext, mut def_id: ast::def_id) -> ValueRef
             def_id = inline::maybe_instantiate_inline(cx, def_id, true);
         }
         match cx.tcx.items.get_copy(&def_id.node) {
-            ast_map::node_item(@ast::item {
+            ast_map::NodeItem(@ast::item {
                 node: ast::item_static(_, ast::m_imm, _), _
             }, _) => {
                 trans_const(cx, ast::m_imm, def_id.node);

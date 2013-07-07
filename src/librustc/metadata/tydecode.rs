@@ -57,7 +57,7 @@ pub struct PState<'self> {
     data: &'self [u8],
     crate: int,
     pos: uint,
-    tcx: ty::ctxt
+    tcx: ty::ctxt<'self>
 }
 
 fn peek(st: &PState) -> char {

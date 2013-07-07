@@ -383,7 +383,7 @@ pub fn trans_fn_ref_with_vtables(
             || fmt!("local item should be in ast map"));
 
         match *map_node {
-            ast_map::node_foreign_item(_, abis, _, _) => {
+            ast_map::NodeForeignItem(_, abis, _, _) => {
                 must_monomorphise = abis.is_intrinsic()
             }
             _ => {

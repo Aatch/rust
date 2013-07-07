@@ -65,7 +65,7 @@ pub trait Visitor {
             self.visit_view_item(vi);
         }
 
-        for m.items.iter().advance |&@ref i| {
+        for m.items.iter().advance |&i| {
             self.visit_item(i);
         }
     }
@@ -248,7 +248,7 @@ pub trait Visitor {
           | pat_region(@ref inner) => self.visit_pat(inner),
             pat_ident(_, ref path, ref inner) => {
                 self.visit_path(path);
-                for inner.iter().advance |&@ref subpat| {
+                for inner.iter().advance |&subpat| {
                     self.visit_pat(subpat);
                 }
             }

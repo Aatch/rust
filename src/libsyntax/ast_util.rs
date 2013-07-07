@@ -73,14 +73,14 @@ pub fn def_id_of_def(d: def) -> def_id {
     }
 }
 
-impl ToStr for binop {
+impl ToStr for ast::binop {
     #[inline]
     fn to_str(&self) -> ~str {
         (*self).as_str().to_owned()
     }
 }
 
-impl binop {
+impl ast::binop {
 
     #[inline]
     // This technically shouldn't be "as_str", but it doesn't allocate
@@ -148,14 +148,14 @@ impl binop {
     }
 }
 
-impl ToStr for unop {
+impl ToStr for ast::unop {
     #[inline]
     fn to_str(&self) -> ~str {
         (*self).as_str().to_owned()
     }
 }
 
-impl unop {
+impl ast::unop {
     #[inline]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -169,7 +169,7 @@ impl unop {
     }
 }
 
-impl expr {
+impl ast::expr {
     #[inline]
     pub fn is_path(&self) -> bool {
         match self.node {
@@ -185,7 +185,7 @@ impl expr {
 
 }
 
-impl expr_ {
+impl ast::expr_ {
     #[inline]
     pub fn is_call(&self) -> bool {
         match self {
@@ -195,14 +195,14 @@ impl expr_ {
     }
 }
 
-impl ToStr for int_ty {
+impl ToStr for ast::int_ty {
     #[inline]
     fn to_str(&self) -> ~str {
         (*self).as_str().to_owned()
     }
 }
 
-impl int_ty {
+impl ast::int_ty {
     #[inline]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -226,14 +226,14 @@ impl int_ty {
     }
 }
 
-impl ToStr for uint_ty {
+impl ToStr for ast::uint_ty {
     #[inline]
     fn to_str(&self) -> ~str {
         (*self).as_str().to_owned()
     }
 }
 
-impl uint_ty {
+impl ast::uint_ty {
     #[inline]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -257,14 +257,14 @@ impl uint_ty {
 
 }
 
-impl ToStr for float_ty {
+impl ToStr for ast::float_ty {
     #[inline]
     fn to_str(&self) -> ~str {
         (*self).as_str().to_owned()
     }
 }
 
-impl float_ty {
+impl ast::float_ty {
     pub fn as_str(self) -> &'static str {
         match self {
             ty_f   => "f",
@@ -367,7 +367,7 @@ pub fn struct_field_visibility(field: ast::struct_field) -> visibility {
     }
 }
 
-impl inlined_item {
+impl ast::inlined_item {
     fn ident(&self) -> ident {
         match *self {
             ii_item(@ref i)      => i.ident,
@@ -481,7 +481,7 @@ impl<'self> Visitor for IdVisitor<'self> {
                         view_path_list(_, ref paths, id) => {
                             self.id(id);
                             for paths.iter().advance |p| {
-                                self.id(id);
+                                self.id(p.node.id);
                             }
                         }
                     }

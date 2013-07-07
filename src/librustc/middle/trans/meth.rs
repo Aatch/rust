@@ -283,7 +283,7 @@ pub fn trans_static_method_callee(bcx: block,
 
     let mname = if method_id.crate == ast::local_crate {
         match bcx.tcx().items.get_copy(&method_id.node) {
-            ast_map::node_trait_method(trait_method, _, _) => {
+            ast_map::NodeTraitMethod(trait_method, _, _) => {
                 ast_util::trait_method_to_ty_method(trait_method).ident
             }
             _ => fail!("callee is not a trait method")
@@ -348,7 +348,7 @@ pub fn method_with_name_or_default(ccx: &mut CrateContext,
     // None of this feels like it should be the best way to do this.
     let mut did = if impl_id.crate == ast::local_crate {
         match ccx.tcx.items.get_copy(&impl_id.node) {
-            ast_map::node_item(@ast::item {
+            ast_map::NodeItem(&ast::item {
                 node: ast::item_impl(_, _, _, ref ms), _
             }, _) => { method_from_methods(*ms, name) },
             _ => fail!("method_with_name")

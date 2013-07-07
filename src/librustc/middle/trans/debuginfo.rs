@@ -259,8 +259,9 @@ pub fn create_function(fcx: fn_ctxt) -> DISubprogram {
     let fcx = &mut *fcx;
     let span = fcx.span.get();
 
-    let (ident, ret_ty, id) = match cx.tcx.items.get_copy(&fcx.id) {
-      ast_map::node_item(item, _) => {
+    let fnitem = cx.tcx.items.get_copy(&fcx.id);
+    let (ident, ret_ty, id) = match fnitem {
+      ast_map::NodeItem(ref item, _) => {
         match item.node {
           ast::item_fn(ref decl, _, _, _, _) => {
             (item.ident, decl.output, item.id)
@@ -268,10 +269,11 @@ pub fn create_function(fcx: fn_ctxt) -> DISubprogram {
           _ => fcx.ccx.sess.span_bug(item.span, "create_function: item bound to non-function")
         }
       }
-      ast_map::node_method(method, _, _) => {
-          (method.ident, method.decl.output, method.id)
+      ast_map::NodeMethod(@ast::method { decl: ast::fn_decl { output: ref ty, _ },
+                           id: id, ident: ident, _}, _, _) => {
+          (ident, ty, id)
       }
-      ast_map::node_expr(expr) => {
+      ast_map::NodeExpr(ref expr) => {
         match expr.node {
           ast::expr_fn_block(ref decl, _) => {
             let name = gensym_name("fn");

@@ -977,6 +977,7 @@ fn lint_unused_mut() -> visit::vt<@mut Context> {
     })
 }
 
+/*
 fn lint_session() -> visit::vt<@mut Context> {
     ast_util::id_visitor(|id, cx: @mut Context| {
         match cx.tcx.sess.lints.pop(&id) {
@@ -989,6 +990,7 @@ fn lint_session() -> visit::vt<@mut Context> {
         }
     })
 }
+*/
 
 fn lint_unnecessary_allocations() -> visit::vt<@mut Context> {
     // Warn if string and vector literals with sigils are immediately borrowed.
@@ -1138,7 +1140,7 @@ pub fn check_crate(tcx: ty::ctxt, crate: @ast::crate) {
     cx.add_lint(lint_type_limits());
     cx.add_lint(lint_unused_unsafe());
     cx.add_lint(lint_unused_mut());
-    cx.add_lint(lint_session());
+    //cx.add_lint(lint_session());
     cx.add_lint(lint_unnecessary_allocations());
     cx.add_lint(lint_missing_doc());
 

@@ -106,10 +106,10 @@ impl AstConv for CrateCtxt {
             csearch::get_type(self.tcx, id)
         } else {
             match self.tcx.items.find(&id.node) {
-              Some(&ast_map::node_item(item, _)) => {
+              Some(&ast_map::NodeItem(item, _)) => {
                 ty_of_item(self, item)
               }
-              Some(&ast_map::node_foreign_item(foreign_item, abis, _, _)) => {
+              Some(&ast_map::NodeForeignItem(foreign_item, abis, _, _)) => {
                 ty_of_foreign_item(self, foreign_item, abis)
               }
               ref x => {
@@ -195,7 +195,7 @@ pub fn ensure_trait_methods(ccx: &CrateCtxt,
     let tcx = ccx.tcx;
     let region_paramd = tcx.region_paramd_items.find(&trait_id).map(|&x| *x);
     match tcx.items.get_copy(&trait_id) {
-        ast_map::node_item(@ast::item {
+        ast_map::NodeItem(&ast::item {
             node: ast::item_trait(ref generics, _, ref ms),
             _
         }, _) => {
@@ -934,7 +934,7 @@ pub fn convert_foreign(ccx: &CrateCtxt, i: &ast::foreign_item) {
     // moral failing, but at the moment it seems like the only
     // convenient way to extract the ABI. - ndm
     let abis = match ccx.tcx.items.find(&i.id) {
-        Some(&ast_map::node_foreign_item(_, abis, _, _)) => abis,
+        Some(&ast_map::NodeForeignItem(_, abis, _, _)) => abis,
         ref x => {
             ccx.tcx.sess.bug(fmt!("unexpected sort of item \
                                    in get_item_ty(): %?", (*x)));
@@ -986,7 +986,7 @@ fn get_trait_def(ccx: &CrateCtxt, trait_id: ast::def_id) -> @ty::TraitDef {
         ty::lookup_trait_def(ccx.tcx, trait_id)
     } else {
         match ccx.tcx.items.get(&trait_id.node) {
-            &ast_map::node_item(item, _) => trait_def_of_item(ccx, item),
+            &ast_map::NodeItem(item, _) => trait_def_of_item(ccx, item),
             _ => ccx.tcx.sess.bug(fmt!("get_trait_def(%d): not an item",
                                        trait_id.node))
         }

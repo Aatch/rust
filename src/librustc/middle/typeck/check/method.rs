@@ -1200,7 +1200,7 @@ impl<'self> LookupContext<'self> {
     pub fn report_static_candidate(&self, idx: uint, did: def_id) {
         let span = if did.crate == ast::local_crate {
             match self.tcx().items.find(&did.node) {
-              Some(&ast_map::node_method(m, _, _)) => m.span,
+              Some(&ast_map::NodeMethod(m, _, _)) => m.span,
               _ => fail!("report_static_candidate: bad item %?", did)
             }
         } else {

@@ -726,7 +726,7 @@ impl BorrowckCtxt {
         match *loan_path {
             LpVar(id) => {
                 match self.tcx.items.find(&id) {
-                    Some(&ast_map::node_local(ref ident)) => {
+                    Some(&ast_map::NodeLocal(ref ident)) => {
                         out.push_str(token::ident_to_str(ident));
                     }
                     r => {

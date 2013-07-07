@@ -21,7 +21,7 @@ use syntax::{visit, ast_util, ast_map};
 
 pub fn check_crate(sess: Session,
                    crate: &crate,
-                   ast_map: ast_map::map,
+                   ast_map: ast_map::Map,
                    def_map: resolve::DefMap,
                    method_map: typeck::method_map,
                    tcx: ty::ctxt) {
@@ -36,7 +36,7 @@ pub fn check_crate(sess: Session,
 }
 
 pub fn check_item(sess: Session,
-                  ast_map: ast_map::map,
+                  ast_map: ast_map::Map,
                   def_map: resolve::DefMap,
                   it: @item,
                   (_is_const, v): (bool,
@@ -177,15 +177,13 @@ pub fn check_expr(sess: Session,
     match e.node {
       expr_lit(@codemap::spanned {node: lit_int(v, t), _}) => {
         if t != ty_char {
-            if (v as u64) > ast_util::int_ty_max(
-                if t == ty_i { sess.targ_cfg.int_type } else { t }) {
+            if (v as u64) > (if t == ty_i { sess.targ_cfg.int_type } else { t }).max() {
                 sess.span_err(e.span, "literal out of range for its type");
             }
         }
       }
       expr_lit(@codemap::spanned {node: lit_uint(v, t), _}) => {
-        if v > ast_util::uint_ty_max(
-            if t == ty_u { sess.targ_cfg.uint_type } else { t }) {
+        if v > (if t == ty_u { sess.targ_cfg.uint_type } else { t }).max() {
             sess.span_err(e.span, "literal out of range for its type");
         }
       }
@@ -197,13 +195,13 @@ pub fn check_expr(sess: Session,
 // Make sure a const item doesn't recursively refer to itself
 // FIXME: Should use the dependency graph when it's available (#1356)
 pub fn check_item_recursion(sess: Session,
-                            ast_map: ast_map::map,
+                            ast_map: ast_map::Map,
                             def_map: resolve::DefMap,
                             it: @item) {
     struct env {
         root_it: @item,
         sess: Session,
-        ast_map: ast_map::map,
+        ast_map: ast_map::Map,
         def_map: resolve::DefMap,
         idstack: @mut ~[node_id]
     }
@@ -237,7 +235,7 @@ pub fn check_item_recursion(sess: Session,
             expr_path(*) => match env.def_map.find(&e.id) {
                 Some(&def_static(def_id, _)) if ast_util::is_local(def_id) =>
                     match env.ast_map.get_copy(&def_id.node) {
-                        ast_map::node_item(it, _) => {
+                        ast_map::NodeItem(it, _) => {
                             (v.visit_item)(it, (env, v));
                         }
                         _ => fail!("const not bound to an item")

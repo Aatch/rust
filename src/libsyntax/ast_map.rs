@@ -25,8 +25,6 @@ use std::cmp;
 use std::hashmap::HashMap;
 use std::vec;
 
-use std::cast::transmute_region;
-
 pub enum path_elt {
     path_mod(ident),
     path_name(ident)
@@ -123,18 +121,18 @@ pub fn map_crate<'r>(diag: @span_handler, c: &'r crate) -> Map<'r> {
 impl<'self> Ctx<'self> {
     #[inline]
     priv fn life<T>(&self, ptr: &T) -> &'self T {
+        use std::cast::transmute;
+
         /*
-         * This uses transmute region because we need references to
-         * the items in the crate, but threading the lifetimes through
-         * would require a whole new visitor, just for this case.
+         * This uses transmute because we need references to the items in the crate, but threading
+         * the lifetimes through would require a whole new visitor, just for this case.
          *
-         * In this instance, the lifetime assurance is provided by the
-         * map_crate function, so transmuting the region like this is
-         * safe. If somebody want to make a new visitor though, go for
-         * it.
+         * In this instance, the lifetime assurance is provided by the map_crate function, so
+         * transmuting the region like this is safe. If somebody want to make a new visitor though,
+         * go for it.
          */
         unsafe {
-            transmute_region(ptr)
+            transmute(ptr)
         }
     }
 
@@ -159,8 +157,9 @@ impl<'self> Visitor for Ctx<'self> {
         match i.node {
             item_impl(_, _, _, ref ms) => {
                 let impl_did = ast_util::local_def(i.id);
-                for ms.iter().advance |&@ ref m| {
+                for ms.iter().advance |&m| {
                     let p = self.extend(i.ident);
+                    let m = self.life(m);
                     self.map_method(impl_did, p, m);
                 }
             }
@@ -171,7 +170,7 @@ impl<'self> Visitor for Ctx<'self> {
                 }
             }
             item_foreign_mod(ref nm) => {
-                for nm.items.iter().advance |&@ ref nitem| {
+                for nm.items.iter().advance |&nitem| {
                     // Compute the visibility for this native item.
                     let visibility = match nitem.vis {
                         public => public,
@@ -179,6 +178,7 @@ impl<'self> Visitor for Ctx<'self> {
                         inherited => i.vis
                     };
 
+                    let nitem = self.life(nitem);
                     let  p = if nm.sort == ast::named {
                         self.extend(i.ident)
                     } else {

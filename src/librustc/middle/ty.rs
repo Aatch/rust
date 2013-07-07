@@ -266,7 +266,7 @@ struct ctxt_ {
     trait_refs: @mut HashMap<node_id, @TraitRef>,
     trait_defs: @mut HashMap<def_id, @TraitDef>,
 
-    items: ast_map::map,
+    items: ast_map::Map,
     intrinsic_defs: @mut HashMap<ast::def_id, t>,
     freevars: freevars::freevar_map,
     tcache: type_cache,
@@ -853,7 +853,7 @@ pub fn new_ty_hash<V:Copy>() -> @mut HashMap<t, V> {
 
 pub fn mk_ctxt(s: session::Session,
                dm: resolve::DefMap,
-               amap: ast_map::map,
+               amap: ast_map::Map,
                freevars: freevars::freevar_map,
                region_maps: @mut middle::region::RegionMaps,
                region_paramd_items: middle::region::region_paramd_items,
@@ -3503,7 +3503,7 @@ pub fn def_has_ty_params(def: ast::def) -> bool {
 pub fn provided_trait_methods(cx: ctxt, id: ast::def_id) -> ~[@Method] {
     if is_local(id) {
         match cx.items.find(&id.node) {
-            Some(&ast_map::node_item(@ast::item {
+            Some(&ast_map::NodeItem(&ast::item {
                         node: item_trait(_, _, ref ms),
                         _
                     }, _)) =>
@@ -3623,7 +3623,7 @@ pub fn impl_trait_ref(cx: ctxt, id: ast::def_id) -> Option<@TraitRef> {
         if id.crate == ast::local_crate {
             debug!("(impl_trait_ref) searching for trait impl %?", id);
             match cx.items.find(&id.node) {
-                Some(&ast_map::node_item(@ast::item {
+                Some(&ast_map::NodeItem(&ast::item {
                                          node: ast::item_impl(_, ref opt_trait, _, _),
                                          _},
                                          _)) => {
@@ -3657,7 +3657,7 @@ fn struct_ctor_id(cx: ctxt, struct_did: ast::def_id) -> Option<ast::def_id> {
     }
 
     match cx.items.find(&struct_did.node) {
-        Some(&ast_map::node_item(item, _)) => {
+        Some(&ast_map::NodeItem(item, _)) => {
             match item.node {
                 ast::item_struct(struct_def, _) => {
                     struct_def.ctor_id.map(|ctor_id|
@@ -3753,7 +3753,7 @@ pub fn item_path(cx: ctxt, id: ast::def_id) -> ast_map::path {
         // let node = cx.items.get(&id.node);
         // match *node {
         match *cx.items.get(&id.node) {
-          ast_map::node_item(item, path) => {
+          ast_map::NodeItem(item, path) => {
             let item_elt = match item.node {
               item_mod(_) | item_foreign_mod(_) => {
                 ast_map::path_mod(item.ident)
@@ -3765,27 +3765,27 @@ pub fn item_path(cx: ctxt, id: ast::def_id) -> ast_map::path {
             vec::append_one(/*bad*/copy *path, item_elt)
           }
 
-          ast_map::node_foreign_item(nitem, _, _, path) => {
+          ast_map::NodeForeignItem(nitem, _, _, path) => {
             vec::append_one(/*bad*/copy *path,
                             ast_map::path_name(nitem.ident))
           }
 
-          ast_map::node_method(method, _, path) => {
+          ast_map::NodeMethod(method, _, path) => {
             vec::append_one(/*bad*/copy *path,
                             ast_map::path_name(method.ident))
           }
-          ast_map::node_trait_method(trait_method, _, path) => {
+          ast_map::NodeTraitMethod(trait_method, _, path) => {
             let method = ast_util::trait_method_to_ty_method(&*trait_method);
             vec::append_one(/*bad*/copy *path,
                             ast_map::path_name(method.ident))
           }
 
-          ast_map::node_variant(ref variant, _, path) => {
+          ast_map::NodeVariant(ref variant, _, path) => {
             vec::append_one(vec::to_owned(path.init()),
                             ast_map::path_name((*variant).node.name))
           }
 
-          ast_map::node_struct_ctor(_, item, path) => {
+          ast_map::NodeStructCtor(_, item, path) => {
             vec::append_one(/*bad*/copy *path, ast_map::path_name(item.ident))
           }
 
@@ -3822,7 +3822,7 @@ pub fn enum_variants(cx: ctxt, id: ast::def_id) -> @~[VariantInfo] {
           expr, since check_enum_variants also updates the enum_var_cache
          */
         match cx.items.get_copy(&id.node) {
-          ast_map::node_item(@ast::item {
+          ast_map::NodeItem(&ast::item {
                     node: ast::item_enum(ref enum_definition, _),
                     _
                 }, _) => {
@@ -3939,7 +3939,7 @@ pub fn has_attr(tcx: ctxt, did: def_id, attr: &str) -> bool {
     if is_local(did) {
         match tcx.items.find(&did.node) {
             Some(
-                &ast_map::node_item(@ast::item {
+                &ast_map::NodeItem(&ast::item {
                     attrs: ref attrs,
                     _
                 }, _)) => attr::attrs_contains_name(*attrs, attr),
@@ -3993,7 +3993,7 @@ pub fn lookup_field_type(tcx: ctxt,
 pub fn lookup_struct_fields(cx: ctxt, did: ast::def_id) -> ~[field_ty] {
   if did.crate == ast::local_crate {
     match cx.items.find(&did.node) {
-       Some(&ast_map::node_item(i,_)) => {
+       Some(&ast_map::NodeItem(i,_)) => {
          match i.node {
             ast::item_struct(struct_def, _) => {
                struct_field_tys(struct_def.fields)
@@ -4001,8 +4001,8 @@ pub fn lookup_struct_fields(cx: ctxt, did: ast::def_id) -> ~[field_ty] {
             _ => cx.sess.bug("struct ID bound to non-struct")
          }
        }
-       Some(&ast_map::node_variant(ref variant, _, _)) => {
-          match (*variant).node.kind {
+       Some(&ast_map::NodeVariant(variant, _, _)) => {
+          match variant.node.kind {
             ast::struct_variant_kind(struct_def) => {
               struct_field_tys(struct_def.fields)
             }

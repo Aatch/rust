@@ -102,20 +102,30 @@ pub enum AstNode<'self> {
 pub type Map<'self> = HashMap<node_id, AstNode<'self>>;
 
 struct Ctx<'self> {
-    map: Map<'self>,
+    adder: &'self fn(node_id, AstNode<'self>),
     path: path,
     diag: @span_handler,
 }
 
 
 pub fn map_crate<'r>(diag: @span_handler, c: &'r crate) -> Map<'r> {
-    let mut ctx = Ctx {
-        map: HashMap::new(),
-        path: ~[],
-        diag: diag,
-    };
-    ctx.visit_crate(c);
-    ctx.map
+    use std::cast::transmute;
+    let mut map = HashMap::new();
+    {
+        let mut ctx = Ctx {
+            adder: |id, node| {
+                unsafe {
+                    // FIXME(#4868) transmuting because of lifetime collision
+                    let node = transmute(node);
+                    map.insert(id, node);
+                }
+            },
+            path: ~[],
+            diag: diag,
+        };
+        ctx.visit_crate(c);
+    }
+    map
 }
 
 impl<'self> Ctx<'self> {
@@ -140,9 +150,13 @@ impl<'self> Ctx<'self> {
         self.path + &[path_name(elt)]
     }
 
-    pub fn map_method(&mut self, impl_did: def_id, impl_path: path, m: &'self method) {
-        self.map.insert(m.id, NodeMethod(m, impl_did, impl_path));
-        self.map.insert(m.self_id, NodeLocal(special_idents::self_));
+    pub fn add(&self, id: node_id, node: AstNode<'self>) {
+        (self.adder)(id, node);
+    }
+
+    pub fn map_method(&self, impl_did: def_id, impl_path: path, m: &'self method) {
+        self.add(m.id, NodeMethod(m, impl_did, impl_path));
+        self.add(m.self_id, NodeLocal(special_idents::self_));
     }
 
 }
@@ -152,7 +166,7 @@ impl<'self> Visitor for Ctx<'self> {
     pub fn visit_item(&mut self, i: &item) {
         let item_path = copy self.path;
         let i = self.life(i);
-        self.map.insert(i.id, NodeItem(i, copy item_path));
+        self.add(i.id, NodeItem(i, copy item_path));
 
         match i.node {
             item_impl(_, _, _, ref ms) => {
@@ -166,7 +180,7 @@ impl<'self> Visitor for Ctx<'self> {
             item_enum(ref enum_definition, _) => {
                 for enum_definition.variants.iter().advance |v| {
                     let p = self.extend(i.ident);
-                    self.map.insert(v.node.id, NodeVariant(v, i, p));
+                    self.add(v.node.id, NodeVariant(v, i, p));
                 }
             }
             item_foreign_mod(ref nm) => {
@@ -186,7 +200,7 @@ impl<'self> Visitor for Ctx<'self> {
                         copy self.path
                     };
 
-                    self.map.insert(nitem.id,
+                    self.add(nitem.id,
                         NodeForeignItem(
                             nitem,
                             nm.abis,
@@ -198,17 +212,17 @@ impl<'self> Visitor for Ctx<'self> {
             item_struct(@ref struct_def, _) if struct_def.ctor_id.is_some() => {
                 let ctor_id = struct_def.ctor_id.get();
                 let path = self.extend(i.ident);
-                self.map.insert(ctor_id,
+                self.add(ctor_id,
                                 NodeStructCtor(struct_def, i, path));
             }
             item_trait(_, ref traits, ref methods) => {
                 for traits.iter().advance |p| {
-                    self.map.insert(p.ref_id, NodeItem(i, copy item_path));
+                    self.add(p.ref_id, NodeItem(i, copy item_path));
                 }
                 for methods.iter().advance |tm| {
                     let id = ast_util::trait_method_to_ty_method(tm).id;
                     let d_id = ast_util::local_def(i.id);
-                    self.map.insert(id, NodeTraitMethod(tm, d_id, copy item_path));
+                    self.add(id, NodeTraitMethod(tm, d_id, copy item_path));
                 }
             }
             _ => ()
@@ -226,12 +240,12 @@ impl<'self> Visitor for Ctx<'self> {
 
     pub fn visit_expr(&mut self, ex: &expr) {
         let ex = self.life(ex);
-        self.map.insert(ex.id, NodeExpr(ex));
+        self.add(ex.id, NodeExpr(ex));
 
         // Expressions which are or might be calls:
         let r = ex.get_callee_id();
         for r.iter().advance |&callee_id| {
-            self.map.insert(callee_id, NodeCalleeScope(ex));
+            self.add(callee_id, NodeCalleeScope(ex));
         }
 
         self.visit_expr_contents(ex);
@@ -239,28 +253,28 @@ impl<'self> Visitor for Ctx<'self> {
 
     pub fn visit_stmt(&mut self, s: &stmt) {
         let s = self.life(s);
-        self.map.insert(stmt_id(s), NodeStmt(s));
+        self.add(stmt_id(s), NodeStmt(s));
         self.visit_stmt_contents(s);
     }
 
     pub fn visit_fn(&mut self, fk: &FnKind, decl: &fn_decl, body: &blk,
                     sp: codemap::span, id: node_id) {
         for decl.inputs.iter().advance |a| {
-            self.map.insert(a.id, NodeArg);
+            self.add(a.id, NodeArg);
         }
         self.visit_fn_contents(fk, decl, body, sp, id);
     }
 
     pub fn visit_block(&mut self, blk: &blk) {
         let blk = self.life(blk);
-        self.map.insert(blk.node.id, NodeBlock(blk));
+        self.add(blk.node.id, NodeBlock(blk));
         self.visit_block_contents(blk);
     }
 
     pub fn visit_pat(&mut self, pat: &pat) {
         match pat.node {
             pat_ident(_, ref path, _) => {
-                self.map.insert(pat.id, NodeLocal(ast_util::path_to_ident(path)));
+                self.add(pat.id, NodeLocal(ast_util::path_to_ident(path)));
             }
             _ => ()
         }
@@ -273,17 +287,18 @@ impl<'self> Visitor for Ctx<'self> {
 // crate.  The `path` should be the path to the item but should not include
 // the item itself.
 pub fn map_decoded_item<'r>(diag: @span_handler,
-                        map: Map<'r>,
-                        path: path,
-                        ii: &'r inlined_item) -> Map<'r> {
+                            adder: &'r fn(node_id, AstNode<'r>),
+                            path: path,
+                            ii: &'r inlined_item) {
     // I believe it is ok for the local IDs of inlined items from other crates
     // to overlap with the local ids from this crate, so just generate the ids
     // starting from 0.  (In particular, I think these ids are only used in
     // alias analysis, which we will not be running on the inlined items, and
     // even if we did I think it only needs an ordering between local
     // variables that are simultaneously in scope).
+
     let mut cx = Ctx {
-        map: map,
+        adder: adder,
         path: copy path,
         diag: diag,
     };
@@ -294,7 +309,7 @@ pub fn map_decoded_item<'r>(diag: @span_handler,
     match *ii {
         ii_item(*) => { /* fallthrough */ }
         ii_foreign(@ref i) => {
-            cx.map.insert(i.id, NodeForeignItem(i, AbiSet::Intrinsic(),
+            cx.add(i.id, NodeForeignItem(i, AbiSet::Intrinsic(),
                                                   i.vis,    // Wrong but OK
                                                   path));
         }
@@ -305,12 +320,10 @@ pub fn map_decoded_item<'r>(diag: @span_handler,
 
     // visit the item / method contents and add those to the map:
     ii.accept(&mut cx);
-
-    cx.map
 }
 
 
-pub fn node_id_to_str(map: Map, id: node_id, itr: @ident_interner) -> ~str {
+pub fn node_id_to_str(map: &Map, id: node_id, itr: @ident_interner) -> ~str {
     match map.find(&id) {
       None => {
         fmt!("unknown node (id=%d)", id)
@@ -373,7 +386,7 @@ pub fn node_id_to_str(map: Map, id: node_id, itr: @ident_interner) -> ~str {
     }
 }
 
-pub fn node_item_query<Result>(items: Map, id: node_id,
+pub fn node_item_query<Result>(items: &Map, id: node_id,
                                query: &fn(&item) -> Result,
                                error_msg: ~str) -> Result {
     match items.find(&id) {

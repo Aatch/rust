@@ -246,7 +246,7 @@ impl ast::uint_ty {
     }
 
     #[inline]
-    pub fn uint_ty_max(self) -> u64 {
+    pub fn max(self) -> u64 {
         match self {
             ty_u8  => 0xffu64,
             ty_u16 => 0xffffu64,

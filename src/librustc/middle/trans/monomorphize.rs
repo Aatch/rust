@@ -109,14 +109,18 @@ pub fn monomorphic_fn(ccx: @mut CrateContext,
     let tpt = ty::lookup_item_type(ccx.tcx, fn_id);
     let llitem_ty = tpt.ty;
 
+    let mn = {
+        ccx.tcx.items.find(&fn_id.node)
+    };
+
     let map_node = session::expect(
         ccx.sess,
-        ccx.tcx.items.find_copy(&fn_id.node),
+        mn,
         || fmt!("While monomorphizing %?, couldn't find it in the item map \
                  (may have attempted to monomorphize an item \
                  defined in a different crate?)", fn_id));
     // Get the path so that we can create a symbol
-    let (pt, name, span) = match map_node {
+    let (pt, name, span) = match *map_node {
       ast_map::NodeItem(i, ref pt) => (pt, i.ident, i.span),
       ast_map::NodeVariant(v, enm, ref pt) => (pt, v.node.name, enm.span),
       ast_map::NodeMethod(m, _, ref pt) => (pt, m.ident, m.span),
@@ -181,8 +185,8 @@ pub fn monomorphic_fn(ccx: @mut CrateContext,
         lldecl
     };
 
-    let lldecl = match map_node {
-      ast_map::NodeItem(i @ ast::item {
+    let lldecl = match *map_node {
+      ast_map::NodeItem(i @ &ast::item {
                 node: ast::item_fn(ref decl, _, _, _, ref body),
                 _
             }, _) => {
@@ -208,7 +212,7 @@ pub fn monomorphic_fn(ccx: @mut CrateContext,
                                 ref_id);
           d
       }
-      ast_map::NodeVariant(ref v, enum_item, _) => {
+      ast_map::NodeVariant(v, enum_item, _) => {
         let tvs = ty::enum_variants(ccx.tcx, local_def(enum_item.id));
         let this_tv = *tvs.iter().find_(|tv| { tv.id.node == fn_id.node}).get();
         let d = mk_lldecl();
@@ -230,10 +234,10 @@ pub fn monomorphic_fn(ccx: @mut CrateContext,
         meth::trans_method(ccx, pt, mth, Some(psubsts), d);
         d
       }
-      ast_map::NodeTraitMethod(@ast::provided(mth), _, pt) => {
+      ast_map::NodeTraitMethod(&ast::provided(mth), _, ref pt) => {
         let d = mk_lldecl();
         set_inline_hint_if_appr(/*bad*/copy mth.attrs, d);
-        meth::trans_method(ccx, /*bad*/copy *pt, mth, Some(psubsts), d);
+        meth::trans_method(ccx, copy *pt, mth, Some(psubsts), d);
         d
       }
       ast_map::NodeStructCtor(struct_def, _, _) => {

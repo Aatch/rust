@@ -82,7 +82,7 @@ pub fn check_crate<'mm>(tcx: ty::ctxt,
             |span, enum_id| {
         let variant_info = ty::enum_variants(tcx, enum_id)[0];
         let parental_privacy = if is_local(enum_id) {
-            let parent_vis = ast_map::node_item_query(tcx.items, enum_id.node,
+            let parent_vis = ast_map::node_item_query(&tcx.items, enum_id.node,
                                    |it| { it.vis },
                                    ~"unbound enum parent when checking \
                                     dereference of enum type");
@@ -118,9 +118,9 @@ pub fn check_crate<'mm>(tcx: ty::ctxt,
                 tcx.sess.span_bug(span,
                                   fmt!("method was a %s?!",
                                        ast_map::node_id_to_str(
-                                            tcx.items,
+                                            &tcx.items,
                                             method_id,
-                                           token::get_ident_interner())));
+                                            token::get_ident_interner())));
             }
             None => {
                 tcx.sess.span_bug(span, "method not found in \
@@ -182,9 +182,9 @@ pub fn check_crate<'mm>(tcx: ty::ctxt,
                 tcx.sess.span_bug(span,
                                   fmt!("method_is_private: method was a %s?!",
                                        ast_map::node_id_to_str(
-                                            tcx.items,
+                                            &tcx.items,
                                             method_id,
-                                           token::get_ident_interner())));
+                                            token::get_ident_interner())));
             }
             None => {
                 tcx.sess.span_bug(span, "method not found in \
@@ -214,9 +214,9 @@ pub fn check_crate<'mm>(tcx: ty::ctxt,
                                       fmt!("local_item_is_private: item was \
                                             a %s?!",
                                            ast_map::node_id_to_str(
-                                                tcx.items,
+                                                &tcx.items,
                                                 item_id,
-                                               token::get_ident_interner())));
+                                                token::get_ident_interner())));
                 }
                 None => {
                     tcx.sess.span_bug(span, "item not found in AST map?!");

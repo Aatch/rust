@@ -266,7 +266,7 @@ struct ctxt_<'self> {
     trait_refs: @mut HashMap<node_id, @TraitRef>,
     trait_defs: @mut HashMap<def_id, @TraitDef>,
 
-    items: &'self ast_map::Map<'self>,
+    items: ast_map::Map<'self>,
     intrinsic_defs: @mut HashMap<ast::def_id, t>,
     freevars: freevars::freevar_map,
     tcache: type_cache,

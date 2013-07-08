@@ -436,9 +436,9 @@ fn encode_reexported_static_methods(ecx: &EncodeContext,
                                     mod_path: &[ast_map::path_elt],
                                     exp: &middle::resolve::Export2) {
     match ecx.tcx.items.find(&exp.def_id.node) {
-        Some(&ast_map::NodeItem(item, path)) => {
+        Some(&ast_map::NodeItem(item, ref path)) => {
             let original_name = ecx.tcx.sess.str_of(item.ident);
-
+            let path = path.as_slice();
             //
             // We don't need to reexport static methods on items
             // declared in the same module as our `pub use ...` since
@@ -449,7 +449,7 @@ fn encode_reexported_static_methods(ecx: &EncodeContext,
             // encoded metadata for static methods relative to Bar,
             // but not yet for Foo.
             //
-            if mod_path != *path || exp.name != original_name {
+            if mod_path != path || exp.name != original_name {
                 if !encode_reexported_static_base_methods(ecx, ebml_w, exp) {
                     if encode_reexported_static_trait_methods(ecx, ebml_w, exp) {
                         debug!(fmt!("(encode reexported static methods) %s \
@@ -563,7 +563,7 @@ fn encode_info_for_mod(ecx: &EncodeContext,
                         (%?/%?)",
                         ecx.tcx.sess.str_of(ident),
                         did,
-                        ast_map::node_id_to_str(ecx.tcx.items, did, token::get_ident_interner()));
+                        ast_map::node_id_to_str(&ecx.tcx.items, did, token::get_ident_interner()));
 
                 ebml_w.start_tag(tag_mod_impl);
                 ebml_w.wr_str(def_to_str(local_def(did)));

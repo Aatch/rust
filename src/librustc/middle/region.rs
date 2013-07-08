@@ -871,7 +871,7 @@ fn determine_rp_in_struct_field(
 }
 
 pub fn determine_rp_in_crate(sess: Session,
-                             ast_map: ast_map::Map,
+                             ast_map: &ast_map::Map,
                              def_map: resolve::DefMap,
                              crate: &ast::crate)
                           -> region_paramd_items {

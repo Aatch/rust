@@ -96,9 +96,9 @@ pub fn type_uses_for(ccx: @mut CrateContext, fn_id: def_id, n_tps: uint) -> @~[t
                                      fn_id_loc))
     };
     match map_node {
-      ast_map::NodeItem(@ast::item { node: item_fn(_, _, _, _, ref body),
+      ast_map::NodeItem(&ast::item { node: item_fn(_, _, _, _, ref body),
                                       _ }, _) |
-      ast_map::NodeMethod(@ast::method {body: ref body, _}, _, _) => {
+      ast_map::NodeMethod(&ast::method {body: ref body, _}, _, _) => {
         handle_body(&cx, body);
       }
       ast_map::NodeTraitMethod(*) => {
@@ -110,7 +110,7 @@ pub fn type_uses_for(ccx: @mut CrateContext, fn_id: def_id, n_tps: uint) -> @~[t
       ast_map::NodeVariant(_, _, _) => {
         for uint::range(0u, n_tps) |n| { cx.uses[n] |= use_repr;}
       }
-      ast_map::NodeForeignItem(i@@foreign_item { node: foreign_item_fn(*),
+      ast_map::NodeForeignItem(i@&foreign_item { node: foreign_item_fn(*),
                                                    _ },
                                  abi,
                                  _,

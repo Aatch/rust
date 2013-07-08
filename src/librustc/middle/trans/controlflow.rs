@@ -32,7 +32,7 @@ use syntax::ast_map::path_mod;
 use syntax::ast_util;
 use syntax::codemap::span;
 
-pub fn trans_block(bcx: block, b: &ast::blk, dest: expr::Dest) -> block {
+pub fn trans_block<'r>(bcx: block<'r>, b: &ast::blk, dest: expr::Dest) -> block<'r> {
     let _icx = push_ctxt("trans_block");
     let mut bcx = bcx;
     do block_locals(b) |local| {
@@ -242,10 +242,10 @@ pub fn trans_log(log_ex: &ast::expr,
     }
 }
 
-pub fn trans_break_cont(bcx: block,
+pub fn trans_break_cont<'r>(bcx: block<'r>,
                         opt_label: Option<ident>,
                         to_end: bool)
-                     -> block {
+                     -> block<'r> {
     let _icx = push_ctxt("trans_break_cont");
     // Locate closest loop block, outputting cleanup as we go.
     let mut unwind = bcx;

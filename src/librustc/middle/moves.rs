@@ -223,21 +223,21 @@ pub fn moved_variable_node_id_from_def(def: def) -> Option<node_id> {
 // ______________________________________________________________________
 // Expressions
 
-fn compute_modes_for_expr(expr: @expr,
-                          (cx, v): (VisitContext,
-                                    vt<VisitContext>))
+fn compute_modes_for_expr<'r>(expr: @expr,
+                          (cx, v): (VisitContext<'r>,
+                                    vt<VisitContext<'r>>))
 {
     cx.consume_expr(expr, v);
 }
 
 impl<'self> VisitContext<'self> {
-    pub fn consume_exprs(&self, exprs: &[@expr], visitor: vt<VisitContext>) {
+    pub fn consume_exprs(&self, exprs: &[@expr], visitor: vt<VisitContext<'self>>) {
         for exprs.iter().advance |expr| {
             self.consume_expr(*expr, visitor);
         }
     }
 
-    pub fn consume_expr(&self, expr: @expr, visitor: vt<VisitContext>) {
+    pub fn consume_expr(&self, expr: @expr, visitor: vt<VisitContext<'self>>) {
         /*!
          * Indicates that the value of `expr` will be consumed,
          * meaning either copied or moved depending on its type.
@@ -255,7 +255,7 @@ impl<'self> VisitContext<'self> {
         };
     }
 
-    pub fn consume_block(&self, blk: &blk, visitor: vt<VisitContext>) {
+    pub fn consume_block(&self, blk: &blk, visitor: vt<VisitContext<'self>>) {
         /*!
          * Indicates that the value of `blk` will be consumed,
          * meaning either copied or moved depending on its type.
@@ -275,7 +275,7 @@ impl<'self> VisitContext<'self> {
     pub fn use_expr(&self,
                     expr: @expr,
                     expr_mode: UseMode,
-                    visitor: vt<VisitContext>) {
+                    visitor: vt<VisitContext<'self>>) {
         /*!
          * Indicates that `expr` is used with a given mode.  This will
          * in turn trigger calls to the subcomponents of `expr`.
@@ -544,7 +544,7 @@ impl<'self> VisitContext<'self> {
                                    expr: &expr,
                                    receiver_expr: @expr,
                                    arg_exprs: &[@expr],
-                                   visitor: vt<VisitContext>)
+                                   visitor: vt<VisitContext<'self>>)
                                    -> bool {
         if !self.method_map.contains_key(&expr.id) {
             return false;
@@ -561,7 +561,7 @@ impl<'self> VisitContext<'self> {
         return true;
     }
 
-    pub fn consume_arm(&self, arm: &arm, visitor: vt<VisitContext>) {
+    pub fn consume_arm(&self, arm: &arm, visitor: vt<VisitContext<'self>>) {
         for arm.pats.iter().advance |pat| {
             self.use_pat(*pat);
         }
@@ -602,21 +602,21 @@ impl<'self> VisitContext<'self> {
 
     pub fn use_receiver(&self,
                         receiver_expr: @expr,
-                        visitor: vt<VisitContext>) {
+                        visitor: vt<VisitContext<'self>>) {
         self.use_fn_arg(receiver_expr, visitor);
     }
 
     pub fn use_fn_args(&self,
                        _: node_id,
                        arg_exprs: &[@expr],
-                       visitor: vt<VisitContext>) {
+                       visitor: vt<VisitContext<'self>>) {
         //! Uses the argument expressions.
         for arg_exprs.iter().advance |arg_expr| {
             self.use_fn_arg(*arg_expr, visitor);
         }
     }
 
-    pub fn use_fn_arg(&self, arg_expr: @expr, visitor: vt<VisitContext>) {
+    pub fn use_fn_arg(&self, arg_expr: @expr, visitor: vt<VisitContext<'self>>) {
         //! Uses the argument.
         self.consume_expr(arg_expr, visitor)
     }

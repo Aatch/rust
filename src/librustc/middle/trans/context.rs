@@ -113,15 +113,15 @@ pub struct CrateContext<'self> {
 }
 
 impl<'self> CrateContext<'self> {
-    pub fn new(sess: session::Session,
+    pub fn new<'r>(sess: session::Session,
                name: &str,
-               tcx: ty::ctxt,
+               tcx: ty::ctxt<'r>,
                emap2: resolve::ExportMap2,
                maps: astencode::Maps,
                symbol_hasher: hash::State,
                link_meta: LinkMeta,
                reachable: @mut HashSet<ast::node_id>)
-               -> CrateContext {
+               -> CrateContext<'r> {
         unsafe {
             let llcx = llvm::LLVMContextCreate();
             set_task_llcx(llcx);

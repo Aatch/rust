@@ -36,11 +36,10 @@ pub fn check_crate(sess: Session,
 }
 
 pub fn check_item(sess: Session,
-                  ast_map: ast_map::Map,
+                  ast_map: &ast_map::Map,
                   def_map: resolve::DefMap,
                   it: @item,
-                  (_is_const, v): (bool,
-                                   visit::vt<bool>)) {
+                  (_is_const, v): (bool, visit::vt<bool>)) {
     match it.node {
       item_static(_, _, ex) => {
         (v.visit_expr)(ex, (true, v));
@@ -183,7 +182,7 @@ pub fn check_expr(sess: Session,
         }
       }
       expr_lit(@codemap::spanned {node: lit_uint(v, t), _}) => {
-        if v > (if t == ty_u { sess.targ_cfg.uint_type } else { t }).max() {
+        if v > (if t == ty_u { sess.targ_cfg.uint_type } else { t }).uint_ty_max() {
             sess.span_err(e.span, "literal out of range for its type");
         }
       }

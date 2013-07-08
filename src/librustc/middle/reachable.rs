@@ -44,7 +44,7 @@ fn generics_require_inlining(generics: &Generics) -> bool {
 // Returns true if the given item must be inlined because it may be
 // monomorphized or it was marked with `#[inline]`. This will only return
 // true for functions.
-fn item_might_be_inlined(item: @item) -> bool {
+fn item_might_be_inlined(item: &item) -> bool {
     if attributes_specify_inlining(item.attrs) {
         return true
     }
@@ -98,8 +98,7 @@ struct ReachableContext<'self> {
 
 impl<'self> ReachableContext<'self> {
     // Creates a new reachability computation context.
-    fn new(tcx: ty::ctxt, method_map: typeck::method_map)
-           -> ReachableContext {
+    fn new<'r>(tcx: ty::ctxt<'r>, method_map: typeck::method_map) -> ReachableContext<'r> {
         ReachableContext {
             tcx: tcx,
             method_map: method_map,
@@ -110,7 +109,7 @@ impl<'self> ReachableContext<'self> {
 
     // Step 1: Mark all public symbols, and add all public symbols that might
     // be inlined to a worklist.
-    fn mark_public_symbols(&self, crate: @crate) {
+    fn mark_public_symbols(&self, crate: &crate) {
         let reachable_symbols = self.reachable_symbols;
         let worklist = self.worklist;
         let visitor = visit::mk_vt(@Visitor {
@@ -370,7 +369,7 @@ impl<'self> ReachableContext<'self> {
                 }
                 Some(_) => {
                     let ident_interner = token::get_ident_interner();
-                    let desc = ast_map::node_id_to_str(self.tcx.items,
+                    let desc = ast_map::node_id_to_str(&self.tcx.items,
                                                        search_item,
                                                        ident_interner);
                     self.tcx.sess.bug(fmt!("found unexpected thingy in \

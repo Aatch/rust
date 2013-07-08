@@ -437,6 +437,7 @@ pub fn block_cleanups(bcx: block) -> ~[cleanup] {
 }
 
 pub struct scope_info<'self> {
+    parent: Option<@mut scope_info<'self>>,
     loop_break: Option<block<'self>>,
     loop_label: Option<ident>,
     // A list of functions that must be run at when leaving this
@@ -501,11 +502,11 @@ pub struct block_<'self> {
     // block to the function pointed to by llfn.  We insert
     // instructions into that block by way of this block context.
     // The block pointing to this one in the function's digraph.
+    parent: Option<block<'self>>,
     llbb: BasicBlockRef,
     terminated: bool,
     unreachable: bool,
     scope: Option<@mut scope_info<'self>>,
-    parent: Option<block<'self>>,
     // Is this block part of a landing pad?
     is_lpad: bool,
     // info about the AST node this block originated from, if any

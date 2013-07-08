@@ -134,7 +134,13 @@ pub fn decode_inlined_item(cdata: @cstore::crate_metadata,
                ast_map::path_to_str(path, token::get_ident_interner()),
                tcx.sess.str_of(ii.ident()));
         ast_map::map_decoded_item(tcx.sess.diagnostic(),
-                                  dcx.tcx.items, path, &ii);
+                                  |id, node| {
+                                    unsafe {
+                                        let map : &mut ast_map::Map
+                                            = cast::transmute(&tcx.items);
+                                        map.insert(id, node);
+                                    }
+                                  }, path, &ii);
         decode_side_tables(xcx, ast_doc);
         match ii {
           ast::ii_item(i) => {
@@ -707,12 +713,8 @@ impl vtable_decoder_helpers for reader::Decoder {
 // ______________________________________________________________________
 // Encoding and decoding the side tables
 
-trait get_ty_str_ctxt {
-    fn ty_str_ctxt(&self) -> @tyencode::ctxt;
-}
-
-impl<'self> get_ty_str_ctxt for e::EncodeContext<'self> {
-    fn ty_str_ctxt(&self) -> @tyencode::ctxt {
+impl<'self> e::EncodeContext<'self> {
+    fn ty_str_ctxt(&self) -> @tyencode::ctxt<'self> {
         @tyencode::ctxt {
             diag: self.tcx.sess.diagnostic(),
             ds: e::def_to_str,

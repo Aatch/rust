@@ -239,7 +239,7 @@ pub fn compile_rest(sess: Session,
                  middle::resolve::resolve_crate(sess, lang_items, crate));
 
         time(time_passes, ~"looking for entry point",
-             || middle::entry::find_entry_point(sess, crate, ast_map));
+             || middle::entry::find_entry_point(sess, crate, &ast_map));
 
         let freevars = time(time_passes, ~"freevar finding", ||
                             freevars::annotate_freevars(def_map, crate));
@@ -248,7 +248,7 @@ pub fn compile_rest(sess: Session,
                               middle::region::resolve_crate(sess, def_map, crate));
 
         let rp_set = time(time_passes, ~"region parameterization inference", ||
-                          middle::region::determine_rp_in_crate(sess, ast_map, def_map, crate));
+                          middle::region::determine_rp_in_crate(sess, &ast_map, def_map, crate));
 
         let ty_cx = ty::mk_ctxt(sess, def_map, ast_map, freevars,
                                 region_map, rp_set, lang_items);

@@ -367,11 +367,11 @@ impl<'self> Reflector<'self> {
 }
 
 // Emit a sequence of calls to visit_ty::visit_foo
-pub fn emit_calls_to_trait_visit_ty(bcx: block,
+pub fn emit_calls_to_trait_visit_ty<'r>(bcx: block<'r>,
                                     t: ty::t,
                                     visitor_val: ValueRef,
                                     visitor_trait_id: def_id)
-                                 -> block {
+                                 -> block<'r> {
     let final = sub_block(bcx, "final");
     let tydesc_ty = ty::get_tydesc_ty(bcx.ccx().tcx);
     let tydesc_ty = type_of(bcx.ccx(), tydesc_ty);

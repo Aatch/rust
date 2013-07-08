@@ -197,7 +197,7 @@ pub fn re_scope_id_to_str(cx: ctxt, node_id: ast::node_id) -> ~str {
       }
       _ => { cx.sess.bug(
           fmt!("re_scope refers to %s",
-               ast_map::node_id_to_str(cx.items, node_id,
+               ast_map::node_id_to_str(&cx.items, node_id,
                                        token::get_ident_interner()))) }
     }
 }

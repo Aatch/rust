@@ -269,7 +269,7 @@ pub fn create_function(fcx: fn_ctxt) -> DISubprogram {
           _ => fcx.ccx.sess.span_bug(item.span, "create_function: item bound to non-function")
         }
       }
-      ast_map::NodeMethod(@ast::method { decl: ast::fn_decl { output: ref ty, _ },
+      ast_map::NodeMethod(&ast::method { decl: ast::fn_decl { output: ty, _ },
                            id: id, ident: ident, _}, _, _) => {
           (ident, ty, id)
       }

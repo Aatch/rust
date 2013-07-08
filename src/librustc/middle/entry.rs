@@ -125,7 +125,7 @@ impl<'self> EntryContext<'self> {
 }
 
 
-pub fn find_entry_point(session: Session, crate: &crate, ast_map: &ast_map::Map) {
+pub fn find_entry_point<'r>(session: Session, crate: &'r crate, ast_map: &'r ast_map::Map<'r>) {
 
     // FIXME #4404 android JNI hacks
     if *session.building_library &&

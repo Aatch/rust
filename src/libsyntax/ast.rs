@@ -1014,9 +1014,9 @@ pub enum foreign_item_ {
 // that we trans.
 #[deriving(Eq, Encodable, Decodable,IterBytes)]
 pub enum inlined_item {
-    ii_item(@item),
-    ii_method(def_id /* impl id */, @method),
-    ii_foreign(@foreign_item),
+    ii_item(item),
+    ii_method(def_id /* impl id */, method),
+    ii_foreign(foreign_item),
 }
 
 /* hold off on tests ... they appear in a later merge.

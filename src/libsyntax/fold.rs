@@ -17,11 +17,11 @@ use opt_vec::OptVec;
 pub trait ast_fold {
     fn fold_crate(@self, &crate) -> crate;
     fn fold_view_item(@self, &view_item) -> view_item;
-    fn fold_foreign_item(@self, @foreign_item) -> @foreign_item;
-    fn fold_item(@self, @item) -> Option<@item>;
+    fn fold_foreign_item(@self, &foreign_item) -> foreign_item;
+    fn fold_item(@self, &item) -> Option<item>;
     fn fold_struct_field(@self, @struct_field) -> @struct_field;
     fn fold_item_underscore(@self, &item_) -> item_;
-    fn fold_method(@self, @method) -> @method;
+    fn fold_method(@self, &method) -> method;
     fn fold_block(@self, &blk) -> blk;
     fn fold_stmt(@self, &stmt) -> Option<@stmt>;
     fn fold_arm(@self, &arm) -> arm;
@@ -46,11 +46,11 @@ pub struct AstFoldFns {
     //unlike the others, item_ is non-trivial
     fold_crate: @fn(&crate_, span, @ast_fold) -> (crate_, span),
     fold_view_item: @fn(&view_item_, @ast_fold) -> view_item_,
-    fold_foreign_item: @fn(@foreign_item, @ast_fold) -> @foreign_item,
-    fold_item: @fn(@item, @ast_fold) -> Option<@item>,
+    fold_foreign_item: @fn(&foreign_item, @ast_fold) -> foreign_item,
+    fold_item: @fn(&item, @ast_fold) -> Option<item>,
     fold_struct_field: @fn(@struct_field, @ast_fold) -> @struct_field,
     fold_item_underscore: @fn(&item_, @ast_fold) -> item_,
-    fold_method: @fn(@method, @ast_fold) -> @method,
+    fold_method: @fn(&method, @ast_fold) -> method,
     fold_block: @fn(&blk_, span, @ast_fold) -> (blk_, span),
     fold_stmt: @fn(&stmt_, span, @ast_fold) -> (Option<stmt_>, span),
     fold_arm: @fn(&arm, @ast_fold) -> arm,
@@ -213,12 +213,11 @@ fn noop_fold_view_item(vi: &view_item_, _fld: @ast_fold) -> view_item_ {
 }
 
 
-fn noop_fold_foreign_item(ni: @foreign_item, fld: @ast_fold)
-    -> @foreign_item {
+fn noop_fold_foreign_item(ni: &foreign_item, fld: @ast_fold) -> foreign_item {
     let fold_arg = |x| fold_arg_(x, fld);
     let fold_attribute = |x| fold_attribute_(x, fld);
 
-    @ast::foreign_item {
+    ast::foreign_item {
         ident: fld.fold_ident(ni.ident),
         attrs: ni.attrs.map(|x| fold_attribute(*x)),
         node:
@@ -243,10 +242,10 @@ fn noop_fold_foreign_item(ni: @foreign_item, fld: @ast_fold)
     }
 }
 
-pub fn noop_fold_item(i: @item, fld: @ast_fold) -> Option<@item> {
+pub fn noop_fold_item(i: &item, fld: @ast_fold) -> Option<item> {
     let fold_attribute = |x| fold_attribute_(x, fld);
 
-    Some(@ast::item { ident: fld.fold_ident(i.ident),
+    Some(ast::item { ident: fld.fold_ident(i.ident),
                       attrs: i.attrs.map(|e| fold_attribute(*e)),
                       id: fld.new_id(i.id),
                       node: fld.fold_item_underscore(&i.node),
@@ -302,14 +301,14 @@ pub fn noop_fold_item_underscore(i: &item_, fld: @ast_fold) -> item_ {
                 fold_generics(generics, fld),
                 ifce.map(|p| fold_trait_ref(p, fld)),
                 fld.fold_ty(ty),
-                methods.map(|x| fld.fold_method(*x))
+                methods.map(|x| @fld.fold_method(*x))
             )
         }
         item_trait(ref generics, ref traits, ref methods) => {
             let methods = do methods.map |method| {
                 match *method {
                     required(*) => copy *method,
-                    provided(method) => provided(fld.fold_method(method))
+                    provided(method) => provided(@fld.fold_method(method))
                 }
             };
             item_trait(
@@ -355,8 +354,8 @@ fn fold_struct_field(f: @struct_field, fld: @ast_fold) -> @struct_field {
     }
 }
 
-fn noop_fold_method(m: @method, fld: @ast_fold) -> @method {
-    @ast::method {
+fn noop_fold_method(m: &method, fld: @ast_fold) -> method {
+    ast::method {
         ident: fld.fold_ident(m.ident),
         attrs: /* FIXME (#2543) */ copy m.attrs,
         generics: fold_generics(&m.generics, fld),
@@ -466,7 +465,7 @@ fn noop_fold_decl(d: &decl_, fld: @ast_fold) -> Option<decl_> {
         decl_local(ref l) => Some(decl_local(fld.fold_local(*l))),
         decl_item(it) => {
             match fld.fold_item(it) {
-                Some(it_folded) => Some(decl_item(it_folded)),
+                Some(it_folded) => Some(decl_item(@it_folded)),
                 None => None,
             }
         }
@@ -699,7 +698,10 @@ pub fn noop_fold_ty(t: &ty_, fld: @ast_fold) -> ty_ {
 pub fn noop_fold_mod(m: &_mod, fld: @ast_fold) -> _mod {
     ast::_mod {
         view_items: m.view_items.iter().transform(|x| fld.fold_view_item(x)).collect(),
-        items: m.items.iter().filter_map(|x| fld.fold_item(*x)).collect(),
+        items: m.items.iter()
+            .filter_map(|x| fld.fold_item(*x))
+            .transform(|x| @x)
+            .collect(),
     }
 }
 
@@ -708,7 +710,7 @@ fn noop_fold_foreign_mod(nm: &foreign_mod, fld: @ast_fold) -> foreign_mod {
         sort: nm.sort,
         abis: nm.abis,
         view_items: nm.view_items.iter().transform(|x| fld.fold_view_item(x)).collect(),
-        items: nm.items.iter().transform(|x| fld.fold_foreign_item(*x)).collect(),
+        items: nm.items.iter().transform(|x| @fld.fold_foreign_item(*x)).collect(),
     }
 }
 
@@ -827,10 +829,10 @@ impl ast_fold for AstFoldFns {
             span: (self.new_span)(x.span),
         }
     }
-    fn fold_foreign_item(@self, x: @foreign_item) -> @foreign_item {
+    fn fold_foreign_item(@self, x: &foreign_item) -> foreign_item {
         (self.fold_foreign_item)(x, self as @ast_fold)
     }
-    fn fold_item(@self, i: @item) -> Option<@item> {
+    fn fold_item(@self, i: &item) -> Option<item> {
         (self.fold_item)(i, self as @ast_fold)
     }
     fn fold_struct_field(@self, sf: @struct_field) -> @struct_field {
@@ -847,7 +849,7 @@ impl ast_fold for AstFoldFns {
     fn fold_item_underscore(@self, i: &item_) -> item_ {
         (self.fold_item_underscore)(i, self as @ast_fold)
     }
-    fn fold_method(@self, x: @method) -> @method {
+    fn fold_method(@self, x: &method) -> method {
         (self.fold_method)(x, self as @ast_fold)
     }
     fn fold_block(@self, x: &blk) -> blk {

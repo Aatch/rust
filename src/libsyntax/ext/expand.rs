@@ -170,17 +170,17 @@ static special_block_name : &'static str = " block";
 // When we enter a module, record it, for the sake of `module!`
 pub fn expand_item(extsbox: @mut SyntaxEnv,
                    cx: @ExtCtxt,
-                   it: @ast::item,
+                   it: &ast::item,
                    fld: @ast_fold,
-                   orig: @fn(@ast::item, @ast_fold) -> Option<@ast::item>)
-                -> Option<@ast::item> {
+                   orig: @fn(&ast::item, @ast_fold) -> Option<ast::item>)
+                -> Option<ast::item> {
     // need to do expansion first... it might turn out to be a module.
     let maybe_it = match it.node {
       ast::item_mac(*) => expand_item_mac(extsbox, cx, it, fld),
-      _ => Some(it)
+      _ => Some(/*bad*/ copy *it)
     };
     match maybe_it {
-      Some(it) => {
+      Some(ref it) => {
           match it.node {
               ast::item_mod(_) | ast::item_foreign_mod(_) => {
                   cx.mod_push(it.ident);
@@ -204,9 +204,9 @@ pub fn contains_macro_escape (attrs: &[ast::attribute]) -> bool {
 // Support for item-position macro invocations, exactly the same
 // logic as for expression-position macro invocations.
 pub fn expand_item_mac(extsbox: @mut SyntaxEnv,
-                       cx: @ExtCtxt, it: @ast::item,
+                       cx: @ExtCtxt, it: &ast::item,
                        fld: @ast_fold)
-                    -> Option<@ast::item> {
+                    -> Option<ast::item> {
     let (pth, tts) = match it.node {
         item_mac(codemap::spanned { node: mac_invoc_tt(ref pth, ref tts), _}) => {
             (pth, copy *tts)

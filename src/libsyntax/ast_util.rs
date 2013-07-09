@@ -370,25 +370,25 @@ pub fn struct_field_visibility(field: ast::struct_field) -> visibility {
 impl ast::inlined_item {
     fn ident(&self) -> ident {
         match *self {
-            ii_item(@ref i)      => i.ident,
-            ii_foreign(@ref i)   => i.ident,
-            ii_method(_, @ref m) => m.ident,
+            ii_item(ref i)      => i.ident,
+            ii_foreign(ref i)   => i.ident,
+            ii_method(_, ref m) => m.ident,
         }
     }
 
     fn id(&self) -> ast::node_id {
         match *self {
-            ii_item(@ref i)      => i.id,
-            ii_foreign(@ref i)   => i.id,
-            ii_method(_, @ref m) => m.id,
+            ii_item(ref i)      => i.id,
+            ii_foreign(ref i)   => i.id,
+            ii_method(_, ref m) => m.id,
         }
     }
 
     fn accept<V:Visitor>(&self, v: &mut V) {
         match self {
-            &ii_item(@ref i) => v.visit_item(i),
-            &ii_foreign(@ref i) => v.visit_foreign_item(i),
-            &ii_method(_, @ref m) => {
+            &ii_item(ref i) => v.visit_item(i),
+            &ii_foreign(ref i) => v.visit_foreign_item(i),
+            &ii_method(_, ref m) => {
                 let fk = visit_new::FnKindMethod(&m.ident, &m.generics, m);
                 v.visit_fn(&fk, &m.decl, &m.body, m.span, m.id);
             }

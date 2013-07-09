@@ -308,12 +308,12 @@ pub fn map_decoded_item<'r>(diag: @span_handler,
     // add it to the table now:
     match *ii {
         ii_item(*) => { /* fallthrough */ }
-        ii_foreign(@ref i) => {
+        ii_foreign(ref i) => {
             cx.add(i.id, NodeForeignItem(i, AbiSet::Intrinsic(),
                                                   i.vis,    // Wrong but OK
                                                   path));
         }
-        ii_method(impl_did, @ref m) => {
+        ii_method(impl_did, ref m) => {
             cx.map_method(impl_did, path, m);
         }
     }

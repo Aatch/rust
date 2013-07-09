@@ -19,12 +19,14 @@ use syntax::ast::*;
 use syntax::codemap;
 use syntax::{visit, ast_util, ast_map};
 
-pub fn check_crate(sess: Session,
-                   crate: &crate,
-                   ast_map: ast_map::Map,
-                   def_map: resolve::DefMap,
-                   method_map: typeck::method_map,
-                   tcx: ty::ctxt) {
+use std::cast;
+
+pub fn check_crate<'r>(sess: Session,
+                       crate: &crate,
+                       ast_map: &ast_map::Map<'r>,
+                       def_map: resolve::DefMap,
+                       method_map: typeck::method_map,
+                       tcx: ty::ctxt<'r>) {
     visit::visit_crate(crate, (false, visit::mk_vt(@visit::Visitor {
         visit_item: |a,b| check_item(sess, ast_map, def_map, a, b),
         visit_pat: check_pat,
@@ -182,7 +184,7 @@ pub fn check_expr(sess: Session,
         }
       }
       expr_lit(@codemap::spanned {node: lit_uint(v, t), _}) => {
-        if v > (if t == ty_u { sess.targ_cfg.uint_type } else { t }).uint_ty_max() {
+        if v > (if t == ty_u { sess.targ_cfg.uint_type } else { t }).max() {
             sess.span_err(e.span, "literal out of range for its type");
         }
       }
@@ -193,10 +195,10 @@ pub fn check_expr(sess: Session,
 
 // Make sure a const item doesn't recursively refer to itself
 // FIXME: Should use the dependency graph when it's available (#1356)
-pub fn check_item_recursion(sess: Session,
-                            ast_map: &ast_map::Map,
-                            def_map: resolve::DefMap,
-                            it: @item) {
+pub fn check_item_recursion<'r>(sess: Session,
+                                ast_map: &ast_map::Map<'r>,
+                                def_map: resolve::DefMap,
+                                it: @item) {
     struct env<'self> {
         root_it: @item,
         sess: Session,
@@ -204,6 +206,9 @@ pub fn check_item_recursion(sess: Session,
         def_map: resolve::DefMap,
         idstack: @mut ~[node_id]
     }
+
+    // Workaround not having mutliple lifetime params
+    let ast_map = unsafe { cast::transmute(ast_map) };
 
     let env = env {
         root_it: it,
@@ -220,7 +225,7 @@ pub fn check_item_recursion(sess: Session,
     });
     (visitor.visit_item)(it, (env, visitor));
 
-    fn visit_item(it: @item, (env, v): (env, visit::vt<env>)) {
+    fn visit_item<'r>(it: @item, (env, v): (env<'r>, visit::vt<env<'r>>)) {
         if env.idstack.iter().any(|x| x == &(it.id)) {
             env.sess.span_fatal(env.root_it.span, "recursive constant");
         }
@@ -229,7 +234,7 @@ pub fn check_item_recursion(sess: Session,
         env.idstack.pop();
     }
 
-    fn visit_expr(e: @expr, (env, v): (env, visit::vt<env>)) {
+    fn visit_expr<'r>(e: @expr, (env, v): (env<'r>, visit::vt<env<'r>>)) {
         match e.node {
             expr_path(*) => match env.def_map.find(&e.id) {
                 Some(&def_static(def_id, _)) if ast_util::is_local(def_id) =>

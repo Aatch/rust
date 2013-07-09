@@ -479,7 +479,7 @@ impl<'self> Context<'self> {
         }
     }
 
-    fn add_lint(&mut self, v: visit::vt<@mut Context>) {
+    fn add_lint(&mut self, v: visit::vt<@mut Context<'self>>) {
         self.visitors.push((v, item_stopping_visitor(v)));
     }
 
@@ -564,9 +564,9 @@ fn ty_stopping_visitor<E>(v: visit::vt<E>) -> visit::vt<E> {
     visit::mk_vt(@visit::Visitor {visit_ty: |_t, (_e, _v)| { },.. **v})
 }
 
-fn lint_while_true() -> visit::vt<@mut Context> {
+fn lint_while_true() -> visit::vt<@mut Context<'static>> {
     visit::mk_vt(@visit::Visitor {
-        visit_expr: |e, (cx, vt): (@mut Context, visit::vt<@mut Context>)| {
+        visit_expr: |e, (cx, vt): (@mut Context<'static>, visit::vt<@mut Context<'static>>)| {
             match e.node {
                 ast::expr_while(cond, _) => {
                     match cond.node {
@@ -588,7 +588,7 @@ fn lint_while_true() -> visit::vt<@mut Context> {
     })
 }
 
-fn lint_type_limits() -> visit::vt<@mut Context> {
+fn lint_type_limits<'r>() -> visit::vt<@mut Context<'r>> {
     fn is_valid<T:cmp::Ord>(binop: ast::binop, v: T,
             min: T, max: T) -> bool {
         match binop {
@@ -688,7 +688,7 @@ fn lint_type_limits() -> visit::vt<@mut Context> {
     }
 
     visit::mk_vt(@visit::Visitor {
-        visit_expr: |e, (cx, vt): (@mut Context, visit::vt<@mut Context>)| {
+        visit_expr: |e, (cx, vt): (@mut Context<'r>, visit::vt<@mut Context<'r>>)| {
             match e.node {
                 ast::expr_binary(_, ref binop, @ref l, @ref r) => {
                     if is_comparison(*binop)
@@ -825,9 +825,9 @@ fn check_item_heap(cx: &Context, it: &ast::item) {
     }
 }
 
-fn lint_heap() -> visit::vt<@mut Context> {
+fn lint_heap<'r>() -> visit::vt<@mut Context<'r>> {
     visit::mk_vt(@visit::Visitor {
-        visit_expr: |e, (cx, vt): (@mut Context, visit::vt<@mut Context>)| {
+        visit_expr: |e, (cx, vt): (@mut Context<'r>, visit::vt<@mut Context<'r>>)| {
             let ty = ty::expr_ty(cx.tcx, e);
             check_type(cx, e.span, ty);
             visit::visit_expr(e, (cx, vt));

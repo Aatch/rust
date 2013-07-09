@@ -445,12 +445,12 @@ impl MoveData {
 }
 
 impl<'self> FlowedMoveData<'self> {
-    pub fn new(move_data: @mut MoveData,
-               tcx: ty::ctxt,
+    pub fn new<'r>(move_data: @mut MoveData,
+               tcx: ty::ctxt<'r>,
                method_map: typeck::method_map,
                id_range: ast_util::id_range,
                body: &ast::blk)
-               -> FlowedMoveData
+               -> FlowedMoveData<'r>
     {
         let mut dfcx_moves =
             DataFlowContext::new(tcx,

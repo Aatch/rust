@@ -73,23 +73,23 @@ pub fn generics_of_fn(fk: &fn_kind) -> Generics {
 pub struct Visitor<E> {
     visit_mod: @fn(&_mod, span, node_id, (E, vt<E>)),
     visit_view_item: @fn(&view_item, (E, vt<E>)),
-    visit_foreign_item: @fn(@foreign_item, (E, vt<E>)),
-    visit_item: @fn(@item, (E, vt<E>)),
-    visit_local: @fn(@local, (E, vt<E>)),
+    visit_foreign_item: @fn(&foreign_item, (E, vt<E>)),
+    visit_item: @fn(&item, (E, vt<E>)),
+    visit_local: @fn(&local, (E, vt<E>)),
     visit_block: @fn(&blk, (E, vt<E>)),
-    visit_stmt: @fn(@stmt, (E, vt<E>)),
+    visit_stmt: @fn(&stmt, (E, vt<E>)),
     visit_arm: @fn(&arm, (E, vt<E>)),
-    visit_pat: @fn(@pat, (E, vt<E>)),
-    visit_decl: @fn(@decl, (E, vt<E>)),
-    visit_expr: @fn(@expr, (E, vt<E>)),
-    visit_expr_post: @fn(@expr, (E, vt<E>)),
-    visit_ty: @fn(@Ty, (E, vt<E>)),
+    visit_pat: @fn(&pat, (E, vt<E>)),
+    visit_decl: @fn(&decl, (E, vt<E>)),
+    visit_expr: @fn(&expr, (E, vt<E>)),
+    visit_expr_post: @fn(&expr, (E, vt<E>)),
+    visit_ty: @fn(&Ty, (E, vt<E>)),
     visit_generics: @fn(&Generics, (E, vt<E>)),
     visit_fn: @fn(&fn_kind, &fn_decl, &blk, span, node_id, (E, vt<E>)),
     visit_ty_method: @fn(&ty_method, (E, vt<E>)),
     visit_trait_method: @fn(&trait_method, (E, vt<E>)),
-    visit_struct_def: @fn(@struct_def, ident, &Generics, node_id, (E, vt<E>)),
-    visit_struct_field: @fn(@struct_field, (E, vt<E>)),
+    visit_struct_def: @fn(&struct_def, ident, &Generics, node_id, (E, vt<E>)),
+    visit_struct_field: @fn(&struct_field, (E, vt<E>)),
 }
 
 pub type visitor<E> = @Visitor<E>;
@@ -397,7 +397,7 @@ pub fn visit_trait_method<E: Copy>(m: &trait_method, (e, v): (E, vt<E>)) {
 }
 
 pub fn visit_struct_def<E: Copy>(
-    sd: @struct_def,
+    sd: &struct_def,
     _nm: ast::ident,
     _generics: &Generics,
     _id: node_id,
@@ -450,7 +450,7 @@ pub fn visit_mac<E>(_m: &mac, (_e, _v): (E, vt<E>)) {
     /* no user-serviceable parts inside */
 }
 
-pub fn visit_expr<E: Copy>(ex: @expr, (e, v): (E, vt<E>)) {
+pub fn visit_expr<E: Copy>(ex: &expr, (e, v): (E, vt<E>)) {
     match ex.node {
         expr_vstore(x, _) => (v.visit_expr)(x, (copy e, v)),
         expr_vec(ref es, _) => visit_exprs(*es, (copy e, v)),
@@ -569,29 +569,29 @@ pub fn visit_arm<E: Copy>(a: &arm, (e, v): (E, vt<E>)) {
 pub struct SimpleVisitor {
     visit_mod: @fn(&_mod, span, node_id),
     visit_view_item: @fn(&view_item),
-    visit_foreign_item: @fn(@foreign_item),
-    visit_item: @fn(@item),
-    visit_local: @fn(@local),
+    visit_foreign_item: @fn(&foreign_item),
+    visit_item: @fn(&item),
+    visit_local: @fn(&local),
     visit_block: @fn(&blk),
-    visit_stmt: @fn(@stmt),
+    visit_stmt: @fn(&stmt),
     visit_arm: @fn(&arm),
-    visit_pat: @fn(@pat),
-    visit_decl: @fn(@decl),
-    visit_expr: @fn(@expr),
-    visit_expr_post: @fn(@expr),
-    visit_ty: @fn(@Ty),
+    visit_pat: @fn(&pat),
+    visit_decl: @fn(&decl),
+    visit_expr: @fn(&expr),
+    visit_expr_post: @fn(&expr),
+    visit_ty: @fn(&Ty),
     visit_generics: @fn(&Generics),
     visit_fn: @fn(&fn_kind, &fn_decl, &blk, span, node_id),
     visit_ty_method: @fn(&ty_method),
     visit_trait_method: @fn(&trait_method),
-    visit_struct_def: @fn(@struct_def, ident, &Generics, node_id),
-    visit_struct_field: @fn(@struct_field),
-    visit_struct_method: @fn(@method)
+    visit_struct_def: @fn(&struct_def, ident, &Generics, node_id),
+    visit_struct_field: @fn(&struct_field),
+    visit_struct_method: @fn(&method)
 }
 
 pub type simple_visitor = @SimpleVisitor;
 
-pub fn simple_ignore_ty(_t: @Ty) {}
+pub fn simple_ignore_ty(_t: &Ty) {}
 
 pub fn default_simple_visitor() -> @SimpleVisitor {
     @SimpleVisitor {
@@ -633,15 +633,15 @@ pub fn mk_simple_visitor(v: simple_visitor) -> vt<()> {
         f(vi);
         visit_view_item(vi, (e, v));
     }
-    fn v_foreign_item(f: @fn(@foreign_item), ni: @foreign_item, (e, v): ((), vt<()>)) {
+    fn v_foreign_item(f: @fn(&foreign_item), ni: &foreign_item, (e, v): ((), vt<()>)) {
         f(ni);
         visit_foreign_item(ni, (e, v));
     }
-    fn v_item(f: @fn(@item), i: @item, (e, v): ((), vt<()>)) {
+    fn v_item(f: @fn(&item), i: &item, (e, v): ((), vt<()>)) {
         f(i);
         visit_item(i, (e, v));
     }
-    fn v_local(f: @fn(@local), l: @local, (e, v): ((), vt<()>)) {
+    fn v_local(f: @fn(&local), l: &local, (e, v): ((), vt<()>)) {
         f(l);
         visit_local(l, (e, v));
     }
@@ -649,7 +649,7 @@ pub fn mk_simple_visitor(v: simple_visitor) -> vt<()> {
         f(bl);
         visit_block(bl, (e, v));
     }
-    fn v_stmt(f: @fn(@stmt), st: @stmt, (e, v): ((), vt<()>)) {
+    fn v_stmt(f: @fn(&stmt), st: &stmt, (e, v): ((), vt<()>)) {
         f(st);
         visit_stmt(st, (e, v));
     }
@@ -657,22 +657,22 @@ pub fn mk_simple_visitor(v: simple_visitor) -> vt<()> {
         f(a);
         visit_arm(a, (e, v));
     }
-    fn v_pat(f: @fn(@pat), p: @pat, (e, v): ((), vt<()>)) {
+    fn v_pat(f: @fn(&pat), p: &pat, (e, v): ((), vt<()>)) {
         f(p);
         visit_pat(p, (e, v));
     }
-    fn v_decl(f: @fn(@decl), d: @decl, (e, v): ((), vt<()>)) {
+    fn v_decl(f: @fn(&decl), d: &decl, (e, v): ((), vt<()>)) {
         f(d);
         visit_decl(d, (e, v));
     }
-    fn v_expr(f: @fn(@expr), ex: @expr, (e, v): ((), vt<()>)) {
+    fn v_expr(f: @fn(&expr), ex: &expr, (e, v): ((), vt<()>)) {
         f(ex);
         visit_expr(ex, (e, v));
     }
-    fn v_expr_post(f: @fn(@expr), ex: @expr, (_e, _v): ((), vt<()>)) {
+    fn v_expr_post(f: @fn(&expr), ex: &expr, (_e, _v): ((), vt<()>)) {
         f(ex);
     }
-    fn v_ty(f: @fn(@Ty), ty: @Ty, (e, v): ((), vt<()>)) {
+    fn v_ty(f: @fn(&Ty), ty: &Ty, (e, v): ((), vt<()>)) {
         f(ty);
         visit_ty(ty, (e, v));
     }
@@ -687,8 +687,8 @@ pub fn mk_simple_visitor(v: simple_visitor) -> vt<()> {
         visit_trait_method(m, (e, v));
     }
     fn v_struct_def(
-        f: @fn(@struct_def, ident, &Generics, node_id),
-        sd: @struct_def,
+        f: @fn(&struct_def, ident, &Generics, node_id),
+        sd: &struct_def,
         nm: ident,
         generics: &Generics,
         id: node_id,
@@ -717,9 +717,9 @@ pub fn mk_simple_visitor(v: simple_visitor) -> vt<()> {
         f(fk, decl, body, sp, id);
         visit_fn(fk, decl, body, sp, id, (e, v));
     }
-    let visit_ty: @fn(@Ty, ((), vt<()>)) =
+    let visit_ty: @fn(&Ty, ((), vt<()>)) =
         |a,b| v_ty(v.visit_ty, a, b);
-    fn v_struct_field(f: @fn(@struct_field), sf: @struct_field, (e, v): ((), vt<()>)) {
+    fn v_struct_field(f: @fn(&struct_field), sf: &struct_field, (e, v): ((), vt<()>)) {
         f(sf);
         visit_struct_field(sf, (e, v));
     }

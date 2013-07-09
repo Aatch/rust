@@ -98,11 +98,11 @@ struct LoopScope<'self> {
 }
 
 impl<'self, O:DataFlowOperator> DataFlowContext<'self, O> {
-    pub fn new(tcx: ty::ctxt,
+    pub fn new<'r>(tcx: ty::ctxt<'r>,
                method_map: typeck::method_map,
                oper: O,
                id_range: id_range,
-               bits_per_id: uint) -> DataFlowContext<O> {
+               bits_per_id: uint) -> DataFlowContext<'r, O> {
         let words_per_id = (bits_per_id + uint::bits - 1) / uint::bits;
 
         debug!("DataFlowContext::new(id_range=%?, bits_per_id=%?, words_per_id=%?)",
@@ -304,12 +304,14 @@ impl<'self, O:DataFlowOperator+Copy+'static> DataFlowContext<'self, O> {
             return;
         }
 
-        let mut propcx = PropagationContext {
-            dfcx: self,
+        // Workaround not having multiple lifetime params
+        let this = unsafe { cast::transmute(self) };
+        let mut propcx : PropagationContext<O> = PropagationContext {
+            dfcx: this,
             changed: true
         };
 
-        let mut temp = vec::from_elem(self.words_per_id, 0);
+        let mut temp : ~[uint] = vec::from_elem(self.words_per_id, 0);
         let mut loop_scopes = ~[];
 
         while propcx.changed {
@@ -375,7 +377,7 @@ impl<'self, O:DataFlowOperator+Copy+'static> DataFlowContext<'self, O> {
 }
 
 impl<'self, O:DataFlowOperator> PropagationContext<'self, O> {
-    fn tcx(&self) -> ty::ctxt {
+    fn tcx(&self) -> ty::ctxt<'self> {
         self.dfcx.tcx
     }
 

@@ -109,11 +109,11 @@ fn check_struct_safe_for_destructor(cx: Context,
     }
 }
 
-fn check_block(block: &blk, (cx, visitor): (Context, visit::vt<Context>)) {
+fn check_block<'r>(block: &blk, (cx, visitor): (Context<'r>, visit::vt<Context<'r>>)) {
     visit::visit_block(block, (cx, visitor));
 }
 
-fn check_item(item: @item, (cx, visitor): (Context, visit::vt<Context>)) {
+fn check_item<'r>(item: @item, (cx, visitor): (Context<'r>, visit::vt<Context<'r>>)) {
     // If this is a destructor, check kinds.
     if !attrs_contains_name(item.attrs, "unsafe_destructor") {
         match item.node {
@@ -159,8 +159,8 @@ fn check_item(item: @item, (cx, visitor): (Context, visit::vt<Context>)) {
 // Yields the appropriate function to check the kind of closed over
 // variables. `id` is the node_id for some expression that creates the
 // closure.
-fn with_appropriate_checker(cx: Context, id: node_id,
-                            b: &fn(checker: &fn(Context, @freevar_entry))) {
+fn with_appropriate_checker<'r>(cx: Context<'r>, id: node_id,
+                                b: &fn(checker: &fn(Context<'r>, @freevar_entry))) {
     fn check_for_uniq(cx: Context, fv: &freevar_entry, bounds: ty::BuiltinBounds) {
         // all captured data must be owned, regardless of whether it is
         // moved in or copied in.
@@ -226,14 +226,13 @@ fn with_appropriate_checker(cx: Context, id: node_id,
 
 // Check that the free variables used in a shared/sendable closure conform
 // to the copy/move kind bounds. Then recursively check the function body.
-fn check_fn(
+fn check_fn<'r>(
     fk: &visit::fn_kind,
     decl: &fn_decl,
     body: &blk,
     sp: span,
     fn_id: node_id,
-    (cx, v): (Context,
-              visit::vt<Context>)) {
+    (cx, v): (Context<'r>, visit::vt<Context<'r>>)) {
 
     // Check kinds on free variables:
     do with_appropriate_checker(cx, fn_id) |chk| {
@@ -246,7 +245,7 @@ fn check_fn(
     visit::visit_fn(fk, decl, body, sp, fn_id, (cx, v));
 }
 
-pub fn check_expr(e: @expr, (cx, v): (Context, visit::vt<Context>)) {
+pub fn check_expr<'r>(e: @expr, (cx, v): (Context<'r>, visit::vt<Context<'r>>)) {
     debug!("kind::check_expr(%s)", expr_to_str(e, cx.tcx.sess.intr()));
 
     // Handle any kind bounds on type parameters
@@ -321,7 +320,7 @@ pub fn check_expr(e: @expr, (cx, v): (Context, visit::vt<Context>)) {
     visit::visit_expr(e, (cx, v));
 }
 
-fn check_ty(aty: @Ty, (cx, v): (Context, visit::vt<Context>)) {
+fn check_ty<'r>(aty: @Ty, (cx, v): (Context<'r>, visit::vt<Context<'r>>)) {
     match aty.node {
       ty_path(_, _, id) => {
           let r = cx.tcx.node_type_substs.find(&id);

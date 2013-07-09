@@ -46,7 +46,7 @@ struct RestrictionsContext<'self> {
 }
 
 impl<'self> RestrictionsContext<'self> {
-    fn tcx(&self) -> ty::ctxt {
+    fn tcx(&self) -> ty::ctxt<'self> {
         self.bccx.tcx
     }
 

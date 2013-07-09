@@ -105,13 +105,12 @@ pub fn check_crate(
     }
 }
 
-fn borrowck_fn(fk: &visit::fn_kind,
+fn borrowck_fn<'r>(fk: &visit::fn_kind,
                decl: &ast::fn_decl,
                body: &ast::blk,
                sp: span,
                id: ast::node_id,
-               (this, v): (@BorrowckCtxt,
-                           visit::vt<@BorrowckCtxt>)) {
+               (this, v): (@BorrowckCtxt<'r>, visit::vt<@BorrowckCtxt<'r>>)) {
     match fk {
         &visit::fk_anon(*) |
         &visit::fk_fn_block(*) => {
@@ -483,7 +482,7 @@ impl<'self> BorrowckCtxt<'self> {
                    ..*cmt}
     }
 
-    pub fn mc_ctxt(&self) -> mc::mem_categorization_ctxt {
+    pub fn mc_ctxt(&self) -> mc::mem_categorization_ctxt<'self> {
         mc::mem_categorization_ctxt {tcx: self.tcx,
                                  method_map: self.method_map}
     }

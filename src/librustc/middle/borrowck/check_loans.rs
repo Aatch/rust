@@ -31,6 +31,8 @@ use syntax::codemap::span;
 use syntax::visit;
 use util::ppaux::Repr;
 
+use std::cast;
+
 struct CheckLoanCtxt<'self> {
     bccx: @BorrowckCtxt<'self>,
     dfcx_loans: &'self LoanDataFlow<'self>,
@@ -39,12 +41,15 @@ struct CheckLoanCtxt<'self> {
     reported: @mut HashSet<ast::node_id>,
 }
 
-pub fn check_loans(bccx: @BorrowckCtxt,
-                   dfcx_loans: &LoanDataFlow,
-                   move_data: move_data::FlowedMoveData,
-                   all_loans: &[Loan],
+pub fn check_loans<'r>(bccx: @BorrowckCtxt<'r>,
+                   dfcx_loans: &LoanDataFlow<'r>,
+                   move_data: move_data::FlowedMoveData<'r>,
+                   all_loans: &'r [Loan],
                    body: &ast::blk) {
     debug!("check_loans(body id=%?)", body.node.id);
+
+    // Workaround not having multiple lifetime params
+    let dfcx_loans = unsafe { cast::transmute(dfcx_loans) };
 
     let clcx = @mut CheckLoanCtxt {
         bccx: bccx,
@@ -69,7 +74,7 @@ enum MoveError {
 }
 
 impl<'self> CheckLoanCtxt<'self> {
-    pub fn tcx(&self) -> ty::ctxt { self.bccx.tcx }
+    pub fn tcx(&self) -> ty::ctxt<'self> { self.bccx.tcx }
 
     pub fn each_issued_loan(&self,
                             scope_id: ast::node_id,

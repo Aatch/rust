@@ -242,10 +242,10 @@ struct IrMaps<'self> {
     lnks: ~[LiveNodeKind],
 }
 
-fn IrMaps(tcx: ty::ctxt,
+fn IrMaps<'r>(tcx: ty::ctxt<'r>,
           method_map: typeck::method_map,
           capture_map: moves::CaptureMap)
-       -> IrMaps {
+       -> IrMaps<'r> {
     IrMaps {
         tcx: tcx,
         method_map: method_map,
@@ -335,13 +335,12 @@ impl<'self> IrMaps<'self> {
     }
 }
 
-fn visit_fn(fk: &visit::fn_kind,
-            decl: &fn_decl,
-            body: &blk,
-            sp: span,
-            id: node_id,
-            (this, v): (@mut IrMaps,
-                        vt<@mut IrMaps>)) {
+fn visit_fn<'r>(fk: &visit::fn_kind,
+                decl: &fn_decl,
+                body: &blk,
+                sp: span,
+                id: node_id,
+                (this, v): (@mut IrMaps<'r>, vt<@mut IrMaps<'r>>)) {
     debug!("visit_fn: id=%d", id);
     let _i = ::util::common::indenter();
 
@@ -408,7 +407,7 @@ fn visit_fn(fk: &visit::fn_kind,
     lsets.warn_about_unused_args(decl, entry_ln);
 }
 
-fn visit_local(local: @local, (this, vt): (@mut IrMaps, vt<@mut IrMaps>)) {
+fn visit_local<'r>(local: @local, (this, vt): (@mut IrMaps<'r>, vt<@mut IrMaps<'r>>)) {
     let def_map = this.tcx.def_map;
     do pat_util::pat_bindings(def_map, local.node.pat) |_bm, p_id, sp, path| {
         debug!("adding local variable %d", p_id);
@@ -428,7 +427,7 @@ fn visit_local(local: @local, (this, vt): (@mut IrMaps, vt<@mut IrMaps>)) {
     visit::visit_local(local, (this, vt));
 }
 
-fn visit_arm(arm: &arm, (this, vt): (@mut IrMaps, vt<@mut IrMaps>)) {
+fn visit_arm<'r>(arm: &arm, (this, vt): (@mut IrMaps<'r>, vt<@mut IrMaps<'r>>)) {
     let def_map = this.tcx.def_map;
     for arm.pats.iter().advance |pat| {
         do pat_util::pat_bindings(def_map, *pat) |bm, p_id, sp, path| {
@@ -447,7 +446,7 @@ fn visit_arm(arm: &arm, (this, vt): (@mut IrMaps, vt<@mut IrMaps>)) {
     visit::visit_arm(arm, (this, vt));
 }
 
-fn visit_expr(expr: @expr, (this, vt): (@mut IrMaps, vt<@mut IrMaps>)) {
+fn visit_expr<'r>(expr: @expr, (this, vt): (@mut IrMaps<'r>, vt<@mut IrMaps<'r>>)) {
     match expr.node {
       // live nodes required for uses or definitions of variables:
       expr_path(_) | expr_self => {
@@ -564,7 +563,7 @@ struct Liveness<'self> {
     cont_ln: LiveNodeMap
 }
 
-fn Liveness(ir: @mut IrMaps, specials: Specials) -> Liveness {
+fn Liveness<'r>(ir: @mut IrMaps<'r>, specials: Specials) -> Liveness<'r> {
     Liveness {
         ir: ir,
         tcx: ir.tcx,
@@ -1400,7 +1399,7 @@ impl<'self> Liveness<'self> {
 // _______________________________________________________________________
 // Checking for error conditions
 
-fn check_local(local: @local, (this, vt): (@Liveness, vt<@Liveness>)) {
+fn check_local<'r>(local: @local, (this, vt): (@Liveness<'r>, vt<@Liveness<'r>>)) {
     match local.node.init {
       Some(_) => {
         this.warn_about_unused_or_dead_vars_in_pat(local.node.pat);
@@ -1429,14 +1428,14 @@ fn check_local(local: @local, (this, vt): (@Liveness, vt<@Liveness>)) {
     visit::visit_local(local, (this, vt));
 }
 
-fn check_arm(arm: &arm, (this, vt): (@Liveness, vt<@Liveness>)) {
+fn check_arm<'r>(arm: &arm, (this, vt): (@Liveness<'r>, vt<@Liveness<'r>>)) {
     do this.arm_pats_bindings(arm.pats) |ln, var, sp, id| {
         this.warn_about_unused(sp, id, ln, var);
     }
     visit::visit_arm(arm, (this, vt));
 }
 
-fn check_expr(expr: @expr, (this, vt): (@Liveness, vt<@Liveness>)) {
+fn check_expr<'r>(expr: @expr, (this, vt): (@Liveness<'r>, vt<@Liveness<'r>>)) {
     match expr.node {
       expr_assign(l, r) => {
         this.check_lvalue(l, vt);
@@ -1484,9 +1483,9 @@ fn check_expr(expr: @expr, (this, vt): (@Liveness, vt<@Liveness>)) {
     }
 }
 
-fn check_fn(_fk: &visit::fn_kind, _decl: &fn_decl,
+fn check_fn<'r>(_fk: &visit::fn_kind, _decl: &fn_decl,
             _body: &blk, _sp: span, _id: node_id,
-            (_self, _v): (@Liveness, vt<@Liveness>)) {
+            (_self, _v): (@Liveness<'r>, vt<@Liveness<'r>>)) {
     // do not check contents of nested fns
 }
 
@@ -1521,7 +1520,7 @@ impl<'self> Liveness<'self> {
         }
     }
 
-    pub fn check_lvalue(@self, expr: @expr, vt: vt<@Liveness>) {
+    pub fn check_lvalue(@self, expr: @expr, vt: vt<@Liveness<'self>>) {
         match expr.node {
           expr_path(_) => {
             match self.tcx.def_map.get_copy(&expr.id) {

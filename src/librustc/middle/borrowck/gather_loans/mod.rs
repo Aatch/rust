@@ -94,9 +94,8 @@ pub fn gather_loans(bccx: @BorrowckCtxt,
     return (glcx.id_range, glcx.all_loans, glcx.move_data);
 }
 
-fn add_pat_to_id_range(p: @ast::pat,
-                       (this, v): (@mut GatherLoanCtxt,
-                                   visit::vt<@mut GatherLoanCtxt>)) {
+fn add_pat_to_id_range<'r>(p: @ast::pat,
+                       (this, v): (@mut GatherLoanCtxt<'r>, visit::vt<@mut GatherLoanCtxt<'r>>)) {
     // NB: This visitor function just adds the pat ids into the id
     // range. We gather loans that occur in patterns using the
     // `gather_pat()` method below. Eventually these two should be
@@ -105,13 +104,12 @@ fn add_pat_to_id_range(p: @ast::pat,
     visit::visit_pat(p, (this, v));
 }
 
-fn gather_loans_in_fn(fk: &visit::fn_kind,
+fn gather_loans_in_fn<'r>(fk: &visit::fn_kind,
                       decl: &ast::fn_decl,
                       body: &ast::blk,
                       sp: span,
                       id: ast::node_id,
-                      (this, v): (@mut GatherLoanCtxt,
-                                  visit::vt<@mut GatherLoanCtxt>)) {
+                      (this, v): (@mut GatherLoanCtxt<'r>, visit::vt<@mut GatherLoanCtxt<'r>>)) {
     match fk {
         // Do not visit items here, the outer loop in borrowck/mod
         // will visit them for us in turn.
@@ -128,16 +126,18 @@ fn gather_loans_in_fn(fk: &visit::fn_kind,
     }
 }
 
-fn gather_loans_in_block(blk: &ast::blk,
-                         (this, vt): (@mut GatherLoanCtxt,
-                                      visit::vt<@mut GatherLoanCtxt>)) {
+fn gather_loans_in_block<'r>(
+    blk: &ast::blk,
+    (this, vt): (@mut GatherLoanCtxt<'r>, visit::vt<@mut GatherLoanCtxt<'r>>)) {
+
     this.id_range.add(blk.node.id);
     visit::visit_block(blk, (this, vt));
 }
 
-fn gather_loans_in_local(local: @ast::local,
-                         (this, vt): (@mut GatherLoanCtxt,
-                                      visit::vt<@mut GatherLoanCtxt>)) {
+fn gather_loans_in_local<'r>(
+    local: @ast::local,
+    (this, vt): (@mut GatherLoanCtxt<'r>, visit::vt<@mut GatherLoanCtxt<'r>>)) {
+
     if local.node.init.is_none() {
         // Variable declarations without initializers are considered "moves":
         let tcx = this.bccx.tcx;
@@ -164,9 +164,10 @@ fn gather_loans_in_local(local: @ast::local,
     visit::visit_local(local, (this, vt));
 }
 
-fn gather_loans_in_expr(ex: @ast::expr,
-                        (this, vt): (@mut GatherLoanCtxt,
-                                     visit::vt<@mut GatherLoanCtxt>)) {
+fn gather_loans_in_expr<'r>(
+    ex: @ast::expr,
+    (this, vt): (@mut GatherLoanCtxt<'r>, visit::vt<@mut GatherLoanCtxt<'r>>)) {
+
     let bccx = this.bccx;
     let tcx = bccx.tcx;
 
@@ -282,7 +283,7 @@ fn gather_loans_in_expr(ex: @ast::expr,
 }
 
 impl<'self> GatherLoanCtxt<'self> {
-    pub fn tcx(&self) -> ty::ctxt { self.bccx.tcx }
+    pub fn tcx(&self) -> ty::ctxt<'self> { self.bccx.tcx }
 
     pub fn push_repeating_id(&mut self, id: ast::node_id) {
         self.repeating_ids.push(id);
@@ -699,9 +700,8 @@ impl<'self> GatherLoanCtxt<'self> {
 
 // Setting up info that preserve needs.
 // This is just the most convenient place to do it.
-fn add_stmt_to_map(stmt: @ast::stmt,
-                   (this, vt): (@mut GatherLoanCtxt,
-                                visit::vt<@mut GatherLoanCtxt>)) {
+fn add_stmt_to_map<'r>(stmt: @ast::stmt,
+                       (this, vt): (@mut GatherLoanCtxt<'r>, visit::vt<@mut GatherLoanCtxt<'r>>)) {
     match stmt.node {
         ast::stmt_expr(_, id) | ast::stmt_semi(_, id) => {
             this.bccx.stmt_map.insert(id);

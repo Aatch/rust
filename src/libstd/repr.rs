@@ -304,7 +304,6 @@ impl TyVisitor for ReprVisitor {
         }
     }
 
-    #[cfg(not(stage0))]
     fn visit_uniq_managed(&self, mtbl: uint, inner: *TyDesc) -> bool {
         self.writer.write_char('~');
         self.write_mut_qualifier(mtbl);

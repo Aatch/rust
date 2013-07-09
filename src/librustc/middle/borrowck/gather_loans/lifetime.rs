@@ -59,7 +59,7 @@ struct GuaranteeLifetimeContext<'self> {
 }
 
 impl<'self> GuaranteeLifetimeContext<'self> {
-    fn tcx(&self) -> ty::ctxt {
+    fn tcx(&self) -> ty::ctxt<'self> {
         self.bccx.tcx
     }
 

@@ -36,6 +36,8 @@ use syntax::parse::token;
 use syntax::parse::token::special_idents;
 use syntax::{ast, visit};
 
+use std::cast;
+
 /**
 The region maps encode information about region relationships.
 
@@ -695,21 +697,20 @@ impl<'self> DetermineRpCtxt<'self> {
     }
 }
 
-fn determine_rp_in_item(item: @ast::item,
-                        (cx, visitor): (@mut DetermineRpCtxt,
-                                        visit::vt<@mut DetermineRpCtxt>)) {
+fn determine_rp_in_item<'r>(
+    item: @ast::item,
+    (cx, visitor): (@mut DetermineRpCtxt<'r>, visit::vt<@mut DetermineRpCtxt<'r>>)) {
+
     do cx.with(item.id, true) {
         visit::visit_item(item, (cx, visitor));
     }
 }
 
-fn determine_rp_in_fn(fk: &visit::fn_kind,
-                      decl: &ast::fn_decl,
-                      body: &ast::blk,
-                      _: span,
-                      _: ast::node_id,
-                      (cx, visitor): (@mut DetermineRpCtxt,
-                                      visit::vt<@mut DetermineRpCtxt>)) {
+fn determine_rp_in_fn<'r>(
+    fk: &visit::fn_kind, decl: &ast::fn_decl, body: &ast::blk,
+    _: span, _: ast::node_id,
+    (cx, visitor): (@mut DetermineRpCtxt<'r>, visit::vt<@mut DetermineRpCtxt<'r>>)) {
+
     do cx.with(cx.item_id, false) {
         do cx.with_ambient_variance(rv_contravariant) {
             for decl.inputs.iter().advance |a| {
@@ -723,17 +724,17 @@ fn determine_rp_in_fn(fk: &visit::fn_kind,
     }
 }
 
-fn determine_rp_in_ty_method(ty_m: &ast::ty_method,
-                             (cx, visitor): (@mut DetermineRpCtxt,
-                                             visit::vt<@mut DetermineRpCtxt>)) {
+fn determine_rp_in_ty_method<'r>(
+    ty_m: &ast::ty_method,
+    (cx, visitor): (@mut DetermineRpCtxt<'r>, visit::vt<@mut DetermineRpCtxt<'r>>)) {
     do cx.with(cx.item_id, false) {
         visit::visit_ty_method(ty_m, (cx, visitor));
     }
 }
 
-fn determine_rp_in_ty(ty: @ast::Ty,
-                      (cx, visitor): (@mut DetermineRpCtxt,
-                                      visit::vt<@mut DetermineRpCtxt>)) {
+fn determine_rp_in_ty<'r>(
+    ty: @ast::Ty,
+    (cx, visitor): (@mut DetermineRpCtxt<'r>, visit::vt<@mut DetermineRpCtxt<'r>>)) {
     // we are only interested in types that will require an item to
     // be region-parameterized.  if cx.item_id is zero, then this type
     // is not a member of a type defn nor is it a constitutent of an
@@ -849,9 +850,9 @@ fn determine_rp_in_ty(ty: @ast::Ty,
       }
     }
 
-    fn visit_mt(mt: ast::mt,
-                (cx, visitor): (@mut DetermineRpCtxt,
-                                visit::vt<@mut DetermineRpCtxt>)) {
+    fn visit_mt<'r>(
+        mt: ast::mt,
+        (cx, visitor): (@mut DetermineRpCtxt<'r>, visit::vt<@mut DetermineRpCtxt<'r>>)) {
         // mutability is invariant
         if mt.mutbl == ast::m_mutbl {
             do cx.with_ambient_variance(rv_invariant) {
@@ -863,18 +864,21 @@ fn determine_rp_in_ty(ty: @ast::Ty,
     }
 }
 
-fn determine_rp_in_struct_field(
-        cm: @ast::struct_field,
-        (cx, visitor): (@mut DetermineRpCtxt,
-                        visit::vt<@mut DetermineRpCtxt>)) {
+fn determine_rp_in_struct_field<'r>(
+    cm: @ast::struct_field,
+    (cx, visitor): (@mut DetermineRpCtxt<'r>, visit::vt<@mut DetermineRpCtxt<'r>>)) {
+
     visit::visit_struct_field(cm, (cx, visitor));
 }
 
-pub fn determine_rp_in_crate(sess: Session,
-                             ast_map: &ast_map::Map,
+pub fn determine_rp_in_crate<'r>(sess: Session,
+                             ast_map: &ast_map::Map<'r>,
                              def_map: resolve::DefMap,
-                             crate: &ast::crate)
+                             crate: &'r ast::crate)
                           -> region_paramd_items {
+
+    // Work around no-multiple-lifetime-params bug
+    let ast_map = unsafe { cast::transmute(ast_map) };
     let cx = @mut DetermineRpCtxt {
         sess: sess,
         ast_map: ast_map,

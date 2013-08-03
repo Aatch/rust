@@ -13,6 +13,8 @@ use driver::session;
 use metadata::cstore;
 use metadata::filesearch;
 
+use util::triple;
+
 use std::hashmap::HashSet;
 use std::num;
 use std::os;
@@ -25,10 +27,10 @@ fn not_win32(os: session::os) -> bool {
 
 pub fn get_rpath_flags(sess: session::Session, out_filename: &Path)
                     -> ~[~str] {
-    let os = sess.targ_cfg.os;
+    let triple = sess.target.triple();
 
     // No rpath on windows
-    if os == session::os_win32 {
+    if triple.is_windows() {
         return ~[];
     }
 
@@ -41,7 +43,7 @@ pub fn get_rpath_flags(sess: session::Session, out_filename: &Path)
     // where rustrt is and we know every rust program needs it
     let libs = vec::append_one(libs, get_sysroot_absolute_rt_lib(sess));
 
-    let rpaths = get_rpaths(os, sysroot, output, libs,
+    let rpaths = get_rpaths(triple, sysroot, output, libs,
                             sess.opts.target_triple);
     rpaths_to_flags(rpaths)
 }
@@ -55,7 +57,7 @@ pub fn rpaths_to_flags(rpaths: &[Path]) -> ~[~str] {
     rpaths.iter().transform(|rpath| fmt!("-Wl,-rpath,%s",rpath.to_str())).collect()
 }
 
-fn get_rpaths(os: session::os,
+fn get_rpaths(triple: triple::Triple,
               sysroot: &Path,
               output: &Path,
               libs: &[Path],
@@ -71,7 +73,7 @@ fn get_rpaths(os: session::os,
     // Use relative paths to the libraries. Binaries can be moved
     // as long as they maintain the relative relationship to the
     // crates they depend on.
-    let rel_rpaths = get_rpaths_relative_to_output(os, output, libs);
+    let rel_rpaths = get_rpaths_relative_to_output(triple, output, libs);
 
     // Make backup absolute paths to the libraries. Binaries can
     // be moved as long as the crates they link against don't move.
@@ -100,26 +102,26 @@ fn get_rpaths(os: session::os,
     return rpaths;
 }
 
-fn get_rpaths_relative_to_output(os: session::os,
+fn get_rpaths_relative_to_output(triple: triple::Triple,
                                  output: &Path,
                                  libs: &[Path]) -> ~[Path] {
-    libs.iter().transform(|a| get_rpath_relative_to_output(os, output, a)).collect()
+    libs.iter().transform(|a| get_rpath_relative_to_output(triple, output, a)).collect()
 }
 
-pub fn get_rpath_relative_to_output(os: session::os,
+pub fn get_rpath_relative_to_output(triple: triple::Triple,
                                     output: &Path,
                                     lib: &Path)
                                  -> Path {
     use std::os;
 
-    assert!(not_win32(os));
+    assert!(!triple.is_windows());
 
     // Mac doesn't appear to support $ORIGIN
-    let prefix = match os {
-        session::os_android | session::os_linux | session::os_freebsd
-                          => "$ORIGIN",
-        session::os_macos => "@executable_path",
-        session::os_win32 => util::unreachable()
+    let prefix = if triple.os == triple::Linux || triple.os == triple::FreeBSD
+        || triple.env == triple::Android {
+        "$ORIGIN"
+    } else {
+        "@executable_path"
     };
 
     Path(prefix).push_rel(&get_relative_to(&os::make_absolute(output),

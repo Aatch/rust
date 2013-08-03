@@ -20,6 +20,8 @@ use syntax::oldvisit::{visit_item};
 use syntax::parse::token::special_idents;
 use std::util;
 
+use util::triple;
+
 struct EntryContext {
     session: Session,
 
@@ -44,8 +46,7 @@ type EntryVisitor = vt<@mut EntryContext>;
 pub fn find_entry_point(session: Session, crate: &Crate, ast_map: ast_map::map) {
 
     // FIXME #4404 android JNI hacks
-    if *session.building_library &&
-        session.targ_cfg.os != session::os_android {
+    if *session.building_library && session.target.triple().env != triple::Android {
         // No need to find a main function
         return;
     }
@@ -146,7 +147,7 @@ fn configure_main(ctxt: @mut EntryContext) {
         } else {
             // If we *are* building a library, then we're on android where we still might
             // optionally want to translate main $4404
-            assert_eq!(this.session.targ_cfg.os, session::os_android);
+            assert_eq!(this.session.target.triple().env, triple::Android);
         }
     }
 }

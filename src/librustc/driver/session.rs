@@ -10,13 +10,15 @@
 
 
 use back::link;
-use back::target_strs;
+use back::target;
 use back;
 use driver::driver::host_triple;
 use driver::session;
 use metadata::filesearch;
 use metadata;
 use middle::lint;
+
+use util::triple::Triple;
 
 use syntax::ast::NodeId;
 use syntax::ast::{int_ty, uint_ty, float_ty};
@@ -38,15 +40,6 @@ pub enum crate_type {
     bin_crate,
     lib_crate,
     unknown_crate,
-}
-
-pub struct config {
-    os: os,
-    arch: abi::Architecture,
-    target_strs: target_strs::t,
-    int_type: int_ty,
-    uint_type: uint_ty,
-    float_type: float_ty
 }
 
 pub static verbose:                 uint = 1 <<  0;
@@ -183,7 +176,7 @@ pub enum EntryFnType {
 }
 
 pub struct Session_ {
-    targ_cfg: @config,
+    target: ~target::Target,
     opts: @options,
     cstore: @mut metadata::cstore::CStore,
     parse_sess: @mut ParseSess,

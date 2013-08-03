@@ -10,7 +10,7 @@
 
 
 use back::link;
-use back::{arm, x86, x86_64, mips};
+use back::target;
 use driver::session::{Aggressive};
 use driver::session::{Session, Session_, No, Less, Default};
 use driver::session;
@@ -22,6 +22,7 @@ use metadata::{creader, cstore, filesearch};
 use metadata;
 use middle::{trans, freevars, kind, ty, typeck, lint, astencode, reachable};
 use middle;
+use util::triple;
 use util::common::time;
 use util::ppaux;
 
@@ -65,37 +66,12 @@ pub fn source_name(input: &input) -> @str {
     }
 }
 
-pub fn default_configuration(sess: Session, argv0: @str, input: &input) ->
-   ast::CrateConfig {
-    let (libc, tos) = match sess.targ_cfg.os {
-        session::os_win32 =>   (@"msvcrt.dll", @"win32"),
-        session::os_macos =>   (@"libc.dylib", @"macos"),
-        session::os_linux =>   (@"libc.so.6",  @"linux"),
-        session::os_android => (@"libc.so",    @"android"),
-        session::os_freebsd => (@"libc.so.7",  @"freebsd")
-    };
-
-    // ARM is bi-endian, however using NDK seems to default
-    // to little-endian unless a flag is provided.
-    let (end,arch,wordsz) = match sess.targ_cfg.arch {
-        abi::X86 =>    (@"little", @"x86",    @"32"),
-        abi::X86_64 => (@"little", @"x86_64", @"64"),
-        abi::Arm =>    (@"little", @"arm",    @"32"),
-        abi::Mips =>   (@"big",    @"mips",   @"32")
-    };
-
+pub fn default_configuration(sess: Session, argv0: @str, input: &input) -> ast::CrateConfig {
     let mk = attr::mk_name_value_item_str;
-    return ~[ // Target bindings.
-         attr::mk_word_item(os::FAMILY.to_managed()),
-         mk(@"target_os", tos),
-         mk(@"target_family", os::FAMILY.to_managed()),
-         mk(@"target_arch", arch),
-         mk(@"target_endian", end),
-         mk(@"target_word_size", wordsz),
-         mk(@"target_libc", libc),
-         // Build bindings.
-         mk(@"build_compiler", argv0),
-         mk(@"build_input", source_name(input))];
+    let mut cfg = ~[mk(@"build_compiler", argv0), mk(@"build_input", source_name(input))];
+    sess.target.add_cfgs(&mut cfg);
+
+    return cfg;
 }
 
 pub fn append_configuration(cfg: &mut ast::CrateConfig, name: @str) {
@@ -217,7 +193,7 @@ pub fn phase_3_run_analysis_passes(sess: Session,
     time(time_passes, ~"external crate/lib resolution", ||
          creader::read_crates(sess.diagnostic(), crate, sess.cstore,
                               sess.filesearch,
-                              session::sess_os_to_meta_os(sess.targ_cfg.os),
+                              sess.target.triple().meta_os(),
                               sess.opts.is_static,
                               token::get_ident_interner()));
 
@@ -335,7 +311,7 @@ pub fn phase_5_run_llvm_passes(sess: Session,
                                outputs: &OutputFilenames) {
 
     // NB: Android hack
-    if sess.targ_cfg.arch == abi::Arm &&
+    if sess.target.triple().env == triple::Android &&
         (sess.opts.output_type == link::output_type_object ||
          sess.opts.output_type == link::output_type_exe) {
         let output_type = link::output_type_assembly;
@@ -507,75 +483,6 @@ pub fn pretty_print_input(sess: Session, cfg: ast::CrateConfig, input: &input,
     }
 }
 
-pub fn get_os(triple: &str) -> Option<session::os> {
-    foreach &(name, os) in os_names.iter() {
-        if triple.contains(name) { return Some(os) }
-    }
-    None
-}
-static os_names : &'static [(&'static str, session::os)] = &'static [
-    ("mingw32", session::os_win32),
-    ("win32",   session::os_win32),
-    ("darwin",  session::os_macos),
-    ("android", session::os_android),
-    ("linux",   session::os_linux),
-    ("freebsd", session::os_freebsd)];
-
-pub fn get_arch(triple: &str) -> Option<abi::Architecture> {
-    foreach &(arch, abi) in architecture_abis.iter() {
-        if triple.contains(arch) { return Some(abi) }
-    }
-    None
-}
-static architecture_abis : &'static [(&'static str, abi::Architecture)] = &'static [
-    ("i386",   abi::X86),
-    ("i486",   abi::X86),
-    ("i586",   abi::X86),
-    ("i686",   abi::X86),
-    ("i786",   abi::X86),
-
-    ("x86_64", abi::X86_64),
-
-    ("arm",    abi::Arm),
-    ("xscale", abi::Arm),
-
-    ("mips",   abi::Mips)];
-
-pub fn build_target_config(sopts: @session::options,
-                           demitter: diagnostic::Emitter)
-                        -> @session::config {
-    let os = match get_os(sopts.target_triple) {
-      Some(os) => os,
-      None => early_error(demitter, ~"unknown operating system")
-    };
-    let arch = match get_arch(sopts.target_triple) {
-      Some(arch) => arch,
-      None => early_error(demitter,
-                          ~"unknown architecture: " + sopts.target_triple)
-    };
-    let (int_type, uint_type, float_type) = match arch {
-      abi::X86 => (ast::ty_i32, ast::ty_u32, ast::ty_f64),
-      abi::X86_64 => (ast::ty_i64, ast::ty_u64, ast::ty_f64),
-      abi::Arm => (ast::ty_i32, ast::ty_u32, ast::ty_f64),
-      abi::Mips => (ast::ty_i32, ast::ty_u32, ast::ty_f64)
-    };
-    let target_strs = match arch {
-      abi::X86 => x86::get_target_strs(os),
-      abi::X86_64 => x86_64::get_target_strs(os),
-      abi::Arm => arm::get_target_strs(os),
-      abi::Mips => mips::get_target_strs(os)
-    };
-    let target_cfg = @session::config {
-        os: os,
-        arch: arch,
-        target_strs: target_strs,
-        int_type: int_type,
-        uint_type: uint_type,
-        float_type: float_type
-    };
-    return target_cfg;
-}
-
 pub fn host_triple() -> ~str {
     // Get the host triple out of the build environment. This ensures that our
     // idea of the host triple is the same as for the set of libraries we've
@@ -586,11 +493,11 @@ pub fn host_triple() -> ~str {
     // compile time) the target triple that this rustc is built with and
     // calling that (at runtime) the host triple.
     let ht = env!("CFG_COMPILER_TRIPLE");
-    return if ht != "" {
-            ht.to_owned()
-        } else {
-            fail!("rustc built without CFG_COMPILER_TRIPLE")
-        };
+    if ht != "" {
+        ht.to_owned()
+    } else {
+        fail!("rustc built without CFG_COMPILER_TRIPLE")
+    }
 }
 
 pub fn build_session_options(binary: @str,
@@ -772,7 +679,7 @@ pub fn build_session_(sopts: @session::options,
                       demitter: diagnostic::Emitter,
                       span_diagnostic_handler: @diagnostic::span_handler)
                    -> Session {
-    let target_cfg = build_target_config(sopts, demitter);
+    let target = target::get_target(sopts.target_triple, demitter);
     let p_s = parse::new_parse_sess_special_handler(span_diagnostic_handler,
                                                     cm);
     let cstore = @mut cstore::mk_cstore(token::get_ident_interner());
@@ -781,7 +688,7 @@ pub fn build_session_(sopts: @session::options,
         sopts.target_triple,
         sopts.addl_lib_search_paths);
     @Session_ {
-        targ_cfg: target_cfg,
+        target: target,
         opts: sopts,
         cstore: cstore,
         parse_sess: p_s,
@@ -983,7 +890,7 @@ pub fn early_error(emitter: diagnostic::Emitter, msg: ~str) -> ! {
 pub fn list_metadata(sess: Session, path: &Path, out: @io::Writer) {
     metadata::loader::list_file_metadata(
         token::get_ident_interner(),
-        session::sess_os_to_meta_os(sess.targ_cfg.os), path, out);
+        sess.target.triple().meta_os(), path, out);
 }
 
 #[cfg(test)]

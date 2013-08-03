@@ -60,6 +60,7 @@ use middle::trans::tvec;
 use middle::trans::type_of;
 use middle::trans::type_of::*;
 use middle::ty;
+use util::triple;
 use util::common::indenter;
 use util::ppaux::{Repr, ty_to_str};
 
@@ -1475,9 +1476,10 @@ pub fn with_cond(bcx: @mut Block, val: ValueRef, f: &fn(@mut Block) -> @mut Bloc
 pub fn call_memcpy(cx: @mut Block, dst: ValueRef, src: ValueRef, n_bytes: ValueRef, align: u32) {
     let _icx = push_ctxt("call_memcpy");
     let ccx = cx.ccx();
-    let key = match ccx.sess.targ_cfg.arch {
-        X86 | Arm | Mips => "llvm.memcpy.p0i8.p0i8.i32",
-        X86_64 => "llvm.memcpy.p0i8.p0i8.i64"
+    let key = match ccx.sess.target.triple().arch.pointer_size() {
+        64 => "llvm.memcpy.p0i8.p0i8.i64",
+        16 => "llvm.memcpy.p0i8.p0i8.i16",
+        _ =>  "llvm.memcpy.p0i8.p0i8.i32",
     };
     let memcpy = ccx.intrinsics.get_copy(&key);
     let src_ptr = PointerCast(cx, src, Type::i8p());
@@ -1519,9 +1521,10 @@ pub fn memzero(b: &Builder, llptr: ValueRef, ty: Type) {
     let _icx = push_ctxt("memzero");
     let ccx = b.ccx;
 
-    let intrinsic_key = match ccx.sess.targ_cfg.arch {
-        X86 | Arm | Mips => "llvm.memset.p0i8.i32",
-        X86_64 => "llvm.memset.p0i8.i64"
+    let intrinsic_key = match ccx.sess.target.triple().arch.pointer_size() {
+        64 => "llvm.memset.p0i8.i64",
+        16 => "llvm.memset.p0i8.i16",
+        _ =>  "llvm.memset.p0i8.i32",
     };
 
     let llintrinsicfn = ccx.intrinsics.get_copy(&intrinsic_key);
@@ -2278,7 +2281,7 @@ pub fn register_fn_fuller(ccx: @mut CrateContext,
     // FIXME #4404 android JNI hacks
     let is_entry = is_entry_fn(&ccx.sess, node_id) && (!*ccx.sess.building_library ||
                       (*ccx.sess.building_library &&
-                       ccx.sess.targ_cfg.os == session::os_android));
+                       ccx.sess.target.triple().env == triple::Android));
     if is_entry {
         create_entry_wrapper(ccx, sp, llfn);
     }
@@ -2340,9 +2343,10 @@ pub fn create_entry_wrapper(ccx: @mut CrateContext,
         let llfn = if *ccx.sess.building_library {
             decl_cdecl_fn(ccx.llmod, "amain", llfty)
         } else {
-            let main_name = match ccx.sess.targ_cfg.os {
-                session::os_win32 => ~"WinMain@16",
-                _ => ~"main",
+            let main_name = if ccx.sess.target.triple().is_windows() {
+                ~"WinMain@16"
+            } else {
+                ~"main"
             };
             decl_cdecl_fn(ccx.llmod, main_name, llfty)
         };
@@ -2824,8 +2828,7 @@ pub fn create_module_map(ccx: &mut CrateContext) -> ValueRef {
 
 pub fn decl_crate_map(sess: session::Session, mapmeta: LinkMeta,
                       llmod: ModuleRef) -> ValueRef {
-    let targ_cfg = sess.targ_cfg;
-    let int_type = Type::int(targ_cfg.arch);
+    let int_type = Type::int(sess.target.triple().arch);
     let mut n_subcrates = 1;
     let cstore = sess.cstore;
     while cstore::have_crate_data(cstore, n_subcrates) { n_subcrates += 1; }
@@ -2926,7 +2929,7 @@ pub fn write_metadata(cx: &mut CrateContext, crate: &ast::Crate) {
     };
     unsafe {
         llvm::LLVMSetInitializer(llglobal, llconst);
-        do cx.sess.targ_cfg.target_strs.meta_sect_name.as_c_str |buf| {
+        do cx.sess.target.meta_sect_name().as_c_str |buf| {
             llvm::LLVMSetSection(llglobal, buf)
         };
         lib::llvm::SetLinkage(llglobal, lib::llvm::InternalLinkage);

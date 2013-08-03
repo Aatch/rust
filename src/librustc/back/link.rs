@@ -20,7 +20,7 @@ use metadata::{encoder, csearch, cstore};
 use middle::trans::context::CrateContext;
 use middle::trans::common::gensym_name;
 use middle::ty;
-use util::ppaux;
+use util::{ppaux,triple};
 
 use std::char;
 use std::hash::Streaming;
@@ -252,7 +252,7 @@ pub mod write {
 
             let opts = sess.opts;
             if sess.time_llvm_passes() { llvm::LLVMRustEnableTimePasses(); }
-            let td = mk_target_data(sess.targ_cfg.target_strs.data_layout);
+            let td = mk_target_data(sess.target.data_layout());
             let pm = mk_pass_manager();
             llvm::LLVMAddTargetData(td.lltd, pm.llpm);
 
@@ -342,7 +342,7 @@ pub mod write {
                             sess,
                             pm.llpm,
                             llmod,
-                            sess.targ_cfg.target_strs.target_triple,
+                            sess.target.triple().to_str(),
                             opts.target_feature,
                             output.to_str(),
                             lib::llvm::AssemblyFile as c_uint,
@@ -358,7 +358,7 @@ pub mod write {
                             sess,
                             pm.llpm,
                             llmod,
-                            sess.targ_cfg.target_strs.target_triple,
+                            sess.target.triple().to_str(),
                             opts.target_feature,
                             output.to_str(),
                             lib::llvm::ObjectFile as c_uint,
@@ -372,7 +372,7 @@ pub mod write {
                         sess,
                         pm.llpm,
                         llmod,
-                        sess.targ_cfg.target_strs.target_triple,
+                        sess.target.triple().to_str(),
                         opts.target_feature,
                         output.to_str(),
                         FileType as c_uint,
@@ -781,14 +781,9 @@ pub fn mangle_internal_name_by_seq(_ccx: &mut CrateContext, flav: &str) -> ~str 
 }
 
 
-pub fn output_dll_filename(os: session::os, lm: LinkMeta) -> ~str {
-    let (dll_prefix, dll_suffix) = match os {
-        session::os_win32 => (win32::DLL_PREFIX, win32::DLL_SUFFIX),
-        session::os_macos => (macos::DLL_PREFIX, macos::DLL_SUFFIX),
-        session::os_linux => (linux::DLL_PREFIX, linux::DLL_SUFFIX),
-        session::os_android => (android::DLL_PREFIX, android::DLL_SUFFIX),
-        session::os_freebsd => (freebsd::DLL_PREFIX, freebsd::DLL_SUFFIX),
-    };
+pub fn output_dll_filename(triple: triple::Triple, lm: LinkMeta) -> ~str {
+    let dll_prefix = triple.lib_prefix();
+    let dll_suffix = triple.lib_suffix();
     fmt!("%s%s-%s-%s%s", dll_prefix, lm.name, lm.extras_hash, lm.vers, dll_suffix)
 }
 
@@ -805,8 +800,9 @@ pub fn link_binary(sess: Session,
     // so we add a condition to make it use gcc.
     let cc_prog: ~str = match sess.opts.linker {
         Some(ref linker) => linker.to_str(),
-        None => match sess.targ_cfg.os {
-            session::os_android =>
+        None => {
+            let triple = sess.target.triple();
+            if triple.env == triple::Android {
                 match &sess.opts.android_cross_path {
                     &Some(ref path) => {
                         fmt!("%s/bin/arm-linux-androideabi-gcc", *path)
@@ -815,16 +811,19 @@ pub fn link_binary(sess: Session,
                         sess.fatal("need Android NDK path for linking \
                                     (--android-cross-path)")
                     }
-                },
-            session::os_win32 => ~"gcc",
-            _ => ~"cc"
+                }
+            } else if triple.is_windows() {
+                ~"gcc"
+            } else {
+                ~"cc"
+            }
         }
     };
     // The invocations of cc share some flags across platforms
 
 
     let output = if *sess.building_library {
-        let long_libname = output_dll_filename(sess.targ_cfg.os, lm);
+        let long_libname = output_dll_filename(sess.target.triple(), lm);
         debug!("link_meta.name:  %s", lm.name);
         debug!("long_libname: %s", long_libname);
         debug!("out_filename: %s", out_filename.to_str());
@@ -850,7 +849,7 @@ pub fn link_binary(sess: Session,
     }
 
     // Clean up on Darwin
-    if sess.targ_cfg.os == session::os_macos {
+    if sess.target.triple().is_macosx() {
         run::process_status("dsymutil", [output.to_str()]);
     }
 
@@ -869,9 +868,8 @@ pub fn link_args(sess: Session,
                  lm:LinkMeta) -> ~[~str] {
 
     // Converts a library file-stem into a cc -l argument
-    fn unlib(config: @session::config, stem: ~str) -> ~str {
-        if stem.starts_with("lib") &&
-            config.os != session::os_win32 {
+    fn unlib(triple: triple::Triple, stem: ~str) -> ~str {
+        if stem.starts_with("lib") && !triple.is_windows() {
             stem.slice(3, stem.len()).to_owned()
         } else {
             stem
@@ -880,7 +878,7 @@ pub fn link_args(sess: Session,
 
 
     let output = if *sess.building_library {
-        let long_libname = output_dll_filename(sess.targ_cfg.os, lm);
+        let long_libname = output_dll_filename(sess.target.triple(), lm);
         out_filename.dir_path().push(long_libname)
     } else {
         out_filename.clone()
@@ -890,15 +888,17 @@ pub fn link_args(sess: Session,
     // The location of crates will be determined as needed.
     let stage: ~str = ~"-L" + sess.filesearch.get_target_lib_path().to_str();
 
-    let mut args = vec::append(~[stage], sess.targ_cfg.target_strs.cc_args);
+    let mut args = ~[stage];
+    sess.target.add_cc_args(&mut args);
 
     args.push_all([
         ~"-o", output.to_str(),
         obj_filename.to_str()]);
 
-    let lib_cmd = match sess.targ_cfg.os {
-        session::os_macos => ~"-dynamiclib",
-        _ => ~"-shared"
+    let lib_cmd = if sess.target.triple().is_macosx() {
+        ~"-dynamiclib"
+    } else {
+        ~"-shared"
     };
 
     // # Crate linking
@@ -912,7 +912,7 @@ pub fn link_args(sess: Session,
         }
         let dir = cratepath.dirname();
         if dir != ~"" { args.push(~"-L" + dir); }
-        let libarg = unlib(sess.targ_cfg, cratepath.filestem().get());
+        let libarg = unlib(sess.target.triple(), cratepath.filestem().get());
         args.push(~"-l" + libarg);
     }
 
@@ -948,7 +948,7 @@ pub fn link_args(sess: Session,
 
         // On mac we need to tell the linker to let this library
         // be rpathed
-        if sess.targ_cfg.os == session::os_macos {
+        if sess.target.triple().is_macosx() {
             args.push(~"-Wl,-install_name,@rpath/"
                       + output.filename().get());
         }
@@ -956,7 +956,7 @@ pub fn link_args(sess: Session,
 
     // On linux librt and libdl are an indirect dependencies via rustrt,
     // and binutils 2.22+ won't add them automatically
-    if sess.targ_cfg.os == session::os_linux {
+    if sess.target.triple().os == triple::Linux {
         args.push_all([~"-lrt", ~"-ldl"]);
 
         // LLVM implements the `frem` instruction as a call to `fmod`,
@@ -964,12 +964,12 @@ pub fn link_args(sess: Session,
         // have to be explicit about linking to it. See #2510
         args.push(~"-lm");
     }
-    else if sess.targ_cfg.os == session::os_android {
+    else if sess.target.triple().env == triple::Android {
         args.push_all([~"-ldl", ~"-llog",  ~"-lsupc++", ~"-lgnustl_shared"]);
         args.push(~"-lm");
     }
 
-    if sess.targ_cfg.os == session::os_freebsd {
+    if sess.target.triple().os == triple::FreeBSD {
         args.push_all([~"-pthread", ~"-lrt",
                        ~"-L/usr/local/lib", ~"-lexecinfo",
                        ~"-L/usr/local/lib/gcc46",
@@ -983,7 +983,7 @@ pub fn link_args(sess: Session,
     // linker from the dwarf unwind info. Unfortunately, it does not seem to
     // understand how to unwind our __morestack frame, so we have to turn it
     // off. This has impacted some other projects like GHC.
-    if sess.targ_cfg.os == session::os_macos {
+    if sess.target.triple().is_macosx() {
         args.push(~"-Wl,-no_compact_unwind");
     }
 

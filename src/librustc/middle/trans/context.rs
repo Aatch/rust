@@ -125,23 +125,24 @@ impl CrateContext {
             let llcx = llvm::LLVMContextCreate();
             set_task_llcx(llcx);
             let llmod = name.as_c_str(|buf| llvm::LLVMModuleCreateWithNameInContext(buf, llcx));
-            let data_layout: &str = sess.targ_cfg.target_strs.data_layout;
-            let targ_triple: &str = sess.targ_cfg.target_strs.target_triple;
+
+            let data_layout: &str = sess.target.data_layout();
+            let targ_triple: &str = sess.target.triple().to_str();
+
             data_layout.as_c_str(|buf| llvm::LLVMSetDataLayout(llmod, buf));
             targ_triple.as_c_str(|buf| llvm::LLVMSetTarget(llmod, buf));
-            let targ_cfg = sess.targ_cfg;
 
-            let td = mk_target_data(sess.targ_cfg.target_strs.data_layout);
+            let td = mk_target_data(data_layout);
             let mut tn = TypeNames::new();
 
             let mut intrinsics = base::declare_intrinsics(llmod);
             if sess.opts.extra_debuginfo {
                 base::declare_dbg_intrinsics(llmod, &mut intrinsics);
             }
-            let int_type = Type::int(targ_cfg.arch);
-            let float_type = Type::float(targ_cfg.arch);
-            let tydesc_type = Type::tydesc(targ_cfg.arch);
-            let opaque_vec_type = Type::opaque_vec(targ_cfg.arch);
+            let int_type = Type::int(sess.target.triple().arch);
+            let float_type = Type::float(sess.target.triple().arch);
+            let tydesc_type = Type::tydesc(sess.target.triple().arch);
+            let opaque_vec_type = Type::opaque_vec(sess.target.triple().arch);
 
             let mut str_slice_ty = Type::named_struct("str_slice");
             str_slice_ty.set_struct_body([Type::i8p(), int_type], false);
@@ -212,7 +213,7 @@ impl CrateContext {
                     llvm_insns: HashMap::new(),
                     fn_stats: ~[]
                   },
-                  upcalls: upcall::declare_upcalls(targ_cfg, llmod),
+                  upcalls: upcall::declare_upcalls(sess.target.triple(), llmod),
                   tydesc_type: tydesc_type,
                   int_type: int_type,
                   float_type: float_type,

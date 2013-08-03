@@ -13,6 +13,7 @@ use driver::session;
 use middle::trans::base;
 use middle::trans::type_::Type;
 use lib::llvm::{ModuleRef, ValueRef};
+use util::triple;
 
 pub struct Upcalls {
     trace: ValueRef,
@@ -41,9 +42,9 @@ macro_rules! upcall (
     })
 )
 
-pub fn declare_upcalls(targ_cfg: @session::config, llmod: ModuleRef) -> @Upcalls {
+pub fn declare_upcalls(triple: triple::Triple, llmod: ModuleRef) -> @Upcalls {
     let opaque_ptr = Type::i8().ptr_to();
-    let int_ty = Type::int(targ_cfg.arch);
+    let int_ty = Type::int(triple.arch);
 
     @Upcalls {
         trace: upcall!(fn trace(opaque_ptr, opaque_ptr, int_ty) -> Type::void()),

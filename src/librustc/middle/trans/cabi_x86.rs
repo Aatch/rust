@@ -42,9 +42,11 @@ impl ABIInfo for X86_ABIInfo {
         // Clang's ABI handling is in lib/CodeGen/TargetInfo.cpp
         let sret = {
             let returning_a_struct = rty.kind() == Struct && ret_def;
-            let big_struct = match self.ccx.sess.targ_cfg.os {
-                os_win32 | os_macos => llsize_of_alloc(self.ccx, rty) > 8,
-                _ => true
+            let triple = self.ccx.sess.target.triple();
+            let big_struct = if triple.is_windows() || triple.is_macosx() {
+                llsize_of_alloc(self.ccx, rty) > 8
+            } else {
+                true
             };
             returning_a_struct && big_struct
         };

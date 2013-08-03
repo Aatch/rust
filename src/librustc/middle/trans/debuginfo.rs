@@ -946,7 +946,7 @@ fn vec_metadata(cx: &mut CrateContext,
     let element_llvm_type = type_of::type_of(cx, element_type);
     let (element_size, element_align) = size_and_align_of(cx, element_llvm_type);
 
-    let vec_llvm_type = Type::vec(cx.sess.targ_cfg.arch, &element_llvm_type);
+    let vec_llvm_type = Type::vec(cx.sess.target.triple().arch, &element_llvm_type);
     let vec_type_name: &str = fmt!("[%s]", ty_to_str(cx.tcx, element_type));
 
     let member_llvm_types = vec_llvm_type.field_types();
@@ -981,7 +981,7 @@ fn boxed_vec_metadata(cx: &mut CrateContext,
                    -> DICompositeType {
 
     let element_llvm_type = type_of::type_of(cx, element_type);
-    let vec_llvm_type = Type::vec(cx.sess.targ_cfg.arch, &element_llvm_type);
+    let vec_llvm_type = Type::vec(cx.sess.target.triple().arch, &element_llvm_type);
     let vec_type_name: &str = fmt!("[%s]", ty_to_str(cx.tcx, element_type));
     let vec_metadata = vec_metadata(cx, element_type, span);
 

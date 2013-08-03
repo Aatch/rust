@@ -80,13 +80,9 @@ pub mod back {
     pub mod link;
     pub mod abi;
     pub mod upcall;
-    pub mod arm;
-    pub mod mips;
-    pub mod x86;
-    pub mod x86_64;
     pub mod rpath;
-    pub mod target_strs;
     pub mod passes;
+    pub mod target;
 }
 
 pub mod metadata;

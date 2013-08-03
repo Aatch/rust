@@ -31,6 +31,7 @@ use middle::trans::type_of;
 use middle::ty;
 use middle::ty::FnSig;
 use util::ppaux::ty_to_str;
+use util::triple;
 
 use std::cell::Cell;
 use std::vec;
@@ -46,11 +47,14 @@ use syntax::abi::{RustIntrinsic, Rust, Stdcall, Fastcall,
 use middle::trans::type_::Type;
 
 fn abi_info(ccx: @mut CrateContext) -> @cabi::ABIInfo {
-    return match ccx.sess.targ_cfg.arch {
-        X86 => cabi_x86::abi_info(ccx),
-        X86_64 => cabi_x86_64::abi_info(),
-        Arm => cabi_arm::abi_info(),
-        Mips => cabi_mips::abi_info(),
+    return match ccx.sess.target.triple().arch {
+        triple::X86         => cabi_x86::abi_info(ccx),
+        triple::X86_64      => cabi_x86_64::abi_info(),
+        triple::Arm(_)
+      | triple::Thumb(_)    => cabi_arm::abi_info(),
+        triple::Mips
+      | triple::MipsEL => cabi_mips::abi_info(),
+        a => ccx.sess.bug(fmt!("Unsupported architecture %s given", a.as_str()))
     }
 }
 
@@ -273,7 +277,7 @@ pub fn trans_foreign_mod(ccx: @mut CrateContext,
                          foreign_mod: &ast::foreign_mod) {
     let _icx = push_ctxt("foreign::trans_foreign_mod");
 
-    let arch = ccx.sess.targ_cfg.arch;
+    let arch = ccx.sess.target.triple().arch.to_abi_arch();
     let abi = match foreign_mod.abis.for_arch(arch) {
         None => {
             ccx.sess.fatal(

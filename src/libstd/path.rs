@@ -127,7 +127,7 @@ pub trait GenericPath {
 }
 
 #[cfg(target_os = "linux")]
-#[cfg(target_os = "android")]
+#[cfg(target_env = "android")]
 mod stat {
     #[cfg(target_arch = "x86")]
     pub mod arch {

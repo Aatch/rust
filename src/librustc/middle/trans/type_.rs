@@ -17,8 +17,9 @@ use middle::ty;
 use middle::trans::context::CrateContext;
 use middle::trans::base;
 
+use util::triple;
+
 use syntax::ast;
-use syntax::abi::{Architecture, X86, X86_64, Arm, Mips};
 
 use std::vec;
 use std::cast;
@@ -102,14 +103,17 @@ impl Type {
         Type::i8().ptr_to()
     }
 
-    pub fn int(arch: Architecture) -> Type {
-        match arch {
-            X86 | Arm | Mips => Type::i32(),
-            X86_64 => Type::i64()
+    pub fn int(arch: triple::Arch) -> Type {
+        if arch.pointer_size() == 64 {
+            Type::i64()
+        } else if arch.pointer_size() == 16 {
+            Type::i16()
+        } else {
+            Type::i32()
         }
     }
 
-    pub fn float(_: Architecture) -> Type {
+    pub fn float(_: triple::Arch) -> Type {
         // All architectures currently just use doubles as the default
         // float size
         Type::f64()
@@ -144,7 +148,7 @@ impl Type {
         }
     }
 
-    pub fn size_t(arch: Architecture) -> Type {
+    pub fn size_t(arch: triple::Arch) -> Type {
         Type::int(arch)
     }
 
@@ -198,7 +202,7 @@ impl Type {
             &Type::void())
     }
 
-    pub fn tydesc(arch: Architecture) -> Type {
+    pub fn tydesc(arch: triple::Arch) -> Type {
         let mut tydesc = Type::named_struct("tydesc");
         let glue_fn_ty = Type::glue_fn(Type::i8p()).ptr_to();
 
@@ -222,13 +226,13 @@ impl Type {
         ty!(llvm::LLVMVectorType(ty.to_ref(), len as c_uint))
     }
 
-    pub fn vec(arch: Architecture, ty: &Type) -> Type {
+    pub fn vec(arch: triple::Arch, ty: &Type) -> Type {
         Type::struct_(
             [ Type::int(arch), Type::int(arch), Type::array(ty, 0) ],
         false)
     }
 
-    pub fn opaque_vec(arch: Architecture) -> Type {
+    pub fn opaque_vec(arch: triple::Arch) -> Type {
         Type::vec(arch, &Type::i8())
     }
 

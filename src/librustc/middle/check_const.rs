@@ -178,14 +178,14 @@ pub fn check_expr(sess: Session,
       expr_lit(@codemap::spanned {node: lit_int(v, t), _}) => {
         if t != ty_char {
             if (v as u64) > ast_util::int_ty_max(
-                if t == ty_i { sess.targ_cfg.int_type } else { t }) {
+                if t == ty_i { sess.target.int_type() } else { t }) {
                 sess.span_err(e.span, "literal out of range for its type");
             }
         }
       }
       expr_lit(@codemap::spanned {node: lit_uint(v, t), _}) => {
         if v > ast_util::uint_ty_max(
-            if t == ty_u { sess.targ_cfg.uint_type } else { t }) {
+            if t == ty_u { sess.target.uint_type() } else { t }) {
             sess.span_err(e.span, "literal out of range for its type");
         }
       }

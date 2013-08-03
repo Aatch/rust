@@ -24,6 +24,10 @@
     thumb architechtures.
  */
 
+use std;
+use syntax::abi;
+use metadata;
+
 #[deriving(Eq)]
 pub enum Arch {
     UnknownArch,
@@ -269,6 +273,15 @@ impl Arch {
         }
     }
 
+    pub fn to_abi_arch(self) -> abi::Architecture {
+        match self {
+            X86 => abi::X86,
+            X86_64 => abi::X86_64,
+            Arm(_) => abi::Arm,
+            Mips | MipsEL => abi::Mips,
+            _ => fail!("Unsupported architures given")
+        }
+    }
 }
 
 impl Vendor {
@@ -467,6 +480,25 @@ impl Triple {
         }
     }
 
+
+    pub fn meta_os(&self) -> metadata::loader::os {
+        use metadata::loader;
+
+        if self.env == Android {
+            loader::os_android
+        } else if self.is_windows() {
+            loader::os_win32
+        } else if self.is_macosx() {
+            loader::os_macos
+        } else if self.os == FreeBSD || self.os == KFreeBSD {
+            loader::os_freebsd
+        } else if self.os == Linux {
+            loader::os_linux
+        } else {
+            fail!("Unsupported operating system %s", self.os.as_str())
+        }
+    }
+
     // Predicates
 
     #[inline]
@@ -524,6 +556,36 @@ impl Triple {
     #[inline]
     pub fn is_binfmt_macho(&self) -> bool {
         self.env == MachO || self.is_darwin()
+    }
+
+    pub fn lib_prefix(&self) -> &'static str {
+        if self.is_binfmt_coff() {
+            ""
+        } else if self.is_binfmt_elf() {
+            "lib"
+        } else if self.is_binfmt_macho() {
+            "lib"
+        } else { "" }
+    }
+
+    pub fn lib_suffix(&self) -> &'static str {
+        if self.is_binfmt_coff() {
+            ".dll"
+        } else if self.is_binfmt_elf() {
+            ".so"
+        } else if self.is_binfmt_macho() {
+            ".dylib"
+        } else { "" }
+    }
+
+    pub fn exe_suffix(&self) -> &'static str {
+        if self.is_binfmt_coff() {
+            ".exe"
+        } else if self.is_binfmt_elf() {
+            ""
+        } else if self.is_binfmt_macho() {
+            ""
+        } else { "" }
     }
 }
 

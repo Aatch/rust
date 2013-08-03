@@ -97,6 +97,7 @@ pub mod util {
     pub mod common;
     pub mod ppaux;
     pub mod enum_set;
+    pub mod triple;
 }
 
 pub mod lib {

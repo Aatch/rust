@@ -913,7 +913,11 @@ pub fn link_binary(sess: Session,
     // The invocations of cc share some flags across platforms
 
     let output = if *sess.building_library {
-        let long_libname = output_dll_filename(sess.targ_cfg.os, lm);
+        let long_libname = if sess.opts.is_static {
+            format!("lib{}-{}-{}.rlib", lm.name, lm.extras_hash, lm.vers)
+        } else {
+            output_dll_filename(sess.targ_cfg.os, lm)
+        };
         debug!("link_meta.name:  {}", lm.name);
         debug!("long_libname: {}", long_libname);
         debug!("out_filename: {}", out_filename.display());
@@ -924,6 +928,12 @@ pub fn link_binary(sess: Session,
     } else {
         out_filename.clone()
     };
+
+    // Static "linking" a library consists of just renaming the file
+    if sess.opts.is_static && *sess.building_library {
+        os::rename_file(obj_filename, &output);
+        return;
+    }
 
     debug!("output: {}", output.display());
     let cc_args = link_args(sess, obj_filename, out_filename, lm);

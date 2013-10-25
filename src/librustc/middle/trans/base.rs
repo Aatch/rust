@@ -3092,6 +3092,7 @@ pub fn write_abi_version(ccx: &mut CrateContext) {
         };
         llvm::LLVMSetInitializer(llglobal, llval);
         llvm::LLVMSetGlobalConstant(llglobal, True);
+        lib::llvm::SetLinkage(llglobal, lib::llvm::LinkOnceODRLinkage)
     }
 }
 

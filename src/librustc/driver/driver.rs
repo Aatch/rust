@@ -415,10 +415,12 @@ pub fn stop_after_phase_5(sess: Session) -> bool {
         return true;
     }
 
+    /*
     if sess.opts.is_static && *sess.building_library {
         debug!("building static library, returning early from compile_input");
         return true;
     }
+    */
 
     if sess.opts.jit {
         debug!("running JIT, returning early from compile_input");

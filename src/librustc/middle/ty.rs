@@ -743,6 +743,7 @@ pub enum sty {
     ty_trait(~TyTrait),
     ty_struct(DefId, substs),
     ty_tup(Vec<t>),
+    ty_simd(t, uint),
 
     ty_param(param_ty), // type parameter
     ty_self(DefId), /* special, implicit `self` type parameter;
@@ -1190,7 +1191,7 @@ pub fn mk_t(cx: &ctxt, st: sty) -> t {
         flags |= get(mt.ty).flags;
       }
       &ty_nil | &ty_bool | &ty_char | &ty_int(_) | &ty_float(_) | &ty_uint(_) |
-      &ty_str(_) => {}
+      &ty_str(_) | &ty_simd(..) => {}
       // You might think that we could just return ty_err for
       // any type containing ty_err as a component, and get
       // rid of the has_ty_err flag -- likewise for ty_bot (with
@@ -1445,7 +1446,11 @@ pub fn mk_struct(cx: &ctxt, struct_id: ast::DefId, substs: substs) -> t {
     mk_t(cx, ty_struct(struct_id, substs))
 }
 
-pub fn mk_var(cx: &ctxt, v: TyVid) -> t { mk_infer(cx, TyVar(v)) }
+pub fn mk_simd(cx: ctxt, t: t, n: uint) -> t {
+    mk_t(cx, ty_simd(t, n))
+}
+
+pub fn mk_var(cx: ctxt, v: TyVid) -> t { mk_infer(cx, TyVar(v)) }
 
 pub fn mk_int_var(cx: &ctxt, v: IntVid) -> t { mk_infer(cx, IntVar(v)) }
 
@@ -1471,6 +1476,7 @@ pub fn maybe_walk_ty(ty: t, f: |t| -> bool) {
         ty_nil | ty_bot | ty_bool | ty_char | ty_int(_) | ty_uint(_) | ty_float(_) |
         ty_str(_) | ty_self(_) |
         ty_infer(_) | ty_param(_) | ty_err => {}
+        ty_simd(ty, _) |
         ty_box(ty) | ty_uniq(ty) => maybe_walk_ty(ty, f),
         ty_vec(ref tm, _) | ty_unboxed_vec(ref tm) | ty_ptr(ref tm) |
         ty_rptr(_, ref tm) => {
@@ -1631,7 +1637,7 @@ pub fn type_is_sequence(ty: t) -> bool {
 
 pub fn type_is_simd(cx: &ctxt, ty: t) -> bool {
     match get(ty).sty {
-        ty_struct(did, _) => lookup_simd(cx, did),
+        ty_simd(..) => true,
         _ => false
     }
 }
@@ -1653,20 +1659,14 @@ pub fn sequence_element_type(cx: &ctxt, ty: t) -> t {
 
 pub fn simd_type(cx: &ctxt, ty: t) -> t {
     match get(ty).sty {
-        ty_struct(did, ref substs) => {
-            let fields = lookup_struct_fields(cx, did);
-            lookup_field_type(cx, did, fields.get(0).id, substs)
-        }
+        ty_simd(t, _) => t,
         _ => fail!("simd_type called on invalid type")
     }
 }
 
 pub fn simd_size(cx: &ctxt, ty: t) -> uint {
     match get(ty).sty {
-        ty_struct(did, _) => {
-            let fields = lookup_struct_fields(cx, did);
-            fields.len()
-        }
+        ty_simd(_, sz) => sz,
         _ => fail!("simd_size called on invalid type")
     }
 }
@@ -2122,7 +2122,7 @@ pub fn type_contents(cx: &ctxt, ty: t) -> TypeContents {
         let result = match get(ty).sty {
             // Scalar and unique types are sendable, and durable
             ty_nil | ty_bot | ty_bool | ty_int(_) | ty_uint(_) | ty_float(_) |
-            ty_bare_fn(_) | ty::ty_char => {
+            ty_bare_fn(_) | ty::ty_char | ty_simd(..) => {
                 TC::None
             }
 
@@ -2423,6 +2423,7 @@ pub fn is_instantiable(cx: &ctxt, r_ty: t) -> bool {
             ty_param(_) |
             ty_self(_) |
             ty_vec(_, _) |
+            ty_simd(..) |
             ty_unboxed_vec(_) => {
                 false
             }
@@ -3472,6 +3473,7 @@ pub fn ty_sort_str(cx: &ctxt, t: t) -> ~str {
         ty_closure(_) => ~"fn",
         ty_trait(ref inner) => format!("trait {}", item_path_str(cx, inner.def_id)),
         ty_struct(id, _) => format!("struct {}", item_path_str(cx, id)),
+        ty_simd(ty, n) => format!("simd <{} x {}>", ty_sort_str(cx, ty), n),
         ty_tup(_) => ~"tuple",
         ty_infer(TyVar(_)) => ~"inferred type",
         ty_infer(IntVar(_)) => ~"integral variable",
@@ -4332,10 +4334,7 @@ pub fn is_binopable(cx: &ctxt, ty: t, op: ast::BinOp) -> bool {
         }
     }
 
-    fn tycat(cx: &ctxt, ty: t) -> int {
-        if type_is_simd(cx, ty) {
-            return tycat(cx, simd_type(cx, ty))
-        }
+    fn tycat(cx: ctxt, ty: t) -> int {
         match get(ty).sty {
           ty_char => tycat_char,
           ty_bool => tycat_bool,
@@ -4343,6 +4342,7 @@ pub fn is_binopable(cx: &ctxt, ty: t, op: ast::BinOp) -> bool {
           ty_float(_) | ty_infer(FloatVar(_)) => tycat_float,
           ty_bot => tycat_bot,
           ty_ptr(_) => tycat_raw_ptr,
+          ty_simd(ty, _) => tycat(cx, ty),
           _ => tycat_other
         }
     }
@@ -4914,6 +4914,10 @@ pub fn hash_crate_independent(tcx: &ctxt, t: t, svh: &Svh) -> u64 {
             ty_unboxed_vec(m) => {
                 byte!(24);
                 mt(&mut state, m);
+            }
+            ty_simd(_, len) => {
+                byte!(25);
+                hash!(len);
             }
         }
     });

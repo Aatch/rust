@@ -3451,19 +3451,12 @@ pub fn check_simd(tcx: &ty::ctxt, sp: Span, id: ast::NodeId) {
         return;
     }
     match ty::get(t).sty {
-        ty::ty_struct(did, ref substs) => {
-            let fields = ty::lookup_struct_fields(tcx, did);
-            if fields.is_empty() {
+        ty::ty_simd(t, n) => {
+            if n == 0 {
                 tcx.sess.span_err(sp, "SIMD vector cannot be empty");
                 return;
             }
-            let e = ty::lookup_field_type(tcx, did, fields.get(0).id, substs);
-            if !fields.iter().all(
-                         |f| ty::lookup_field_type(tcx, did, f.id, substs) == e) {
-                tcx.sess.span_err(sp, "SIMD vector should be homogeneous");
-                return;
-            }
-            if !ty::type_is_machine(e) {
+            if !ty::type_is_machine(t) {
                 tcx.sess.span_err(sp, "SIMD vector element type should be \
                                        machine type");
                 return;

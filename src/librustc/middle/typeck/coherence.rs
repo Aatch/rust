@@ -24,7 +24,7 @@ use middle::ty::{ty_str, ty_vec, ty_float, ty_infer, ty_int, ty_nil};
 use middle::ty::{ty_param, ty_param_bounds_and_ty, ty_ptr};
 use middle::ty::{ty_rptr, ty_self, ty_struct, ty_trait, ty_tup};
 use middle::ty::{ty_uint, ty_uniq, ty_bare_fn, ty_closure};
-use middle::ty::{ty_unboxed_vec, type_is_ty_var};
+use middle::ty::{ty_unboxed_vec, ty_simd, type_is_ty_var};
 use middle::subst::Subst;
 use middle::ty;
 use middle::ty::{Impl, Method};
@@ -75,6 +75,7 @@ fn get_base_type(inference_context: &InferCtxt,
     }
 
     match get(resolved_type).sty {
+        ty_simd(..) |
         ty_enum(..) | ty_trait(..) | ty_struct(..) => {
             debug!("(getting base type) found base type");
             Some(resolved_type)

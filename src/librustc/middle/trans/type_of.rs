@@ -146,15 +146,10 @@ pub fn sizing_type_of(cx: &CrateContext, t: ty::t) -> Type {
         }
 
         ty::ty_struct(..) => {
-            if ty::type_is_simd(cx.tcx(), t) {
-                let et = ty::simd_type(cx.tcx(), t);
-                let n = ty::simd_size(cx.tcx(), t);
-                Type::vector(&type_of(cx, et), n as u64)
-            } else {
-                let repr = adt::represent_type(cx, t);
-                adt::sizing_type_of(cx, repr)
-            }
+            let repr = adt::represent_type(cx, t);
+            adt::sizing_type_of(cx, repr)
         }
+        ty::ty_simd(ty, n) => Type::vector(&type_of(cx, ty), n as u64),
 
         ty::ty_self(_) | ty::ty_infer(..) | ty::ty_param(..) | ty::ty_err(..) => {
             cx.sess().bug(format!("fictitious type {:?} in sizing_type_of()",
@@ -261,21 +256,18 @@ pub fn type_of(cx: &CrateContext, t: ty::t) -> Type {
           adt::type_of(cx, repr)
       }
       ty::ty_struct(did, ref substs) => {
-          if ty::type_is_simd(cx.tcx(), t) {
-              let et = ty::simd_type(cx.tcx(), t);
-              let n = ty::simd_size(cx.tcx(), t);
-              Type::vector(&type_of(cx, et), n as u64)
-          } else {
-              // Only create the named struct, but don't fill it in. We fill it
-              // in *after* placing it into the type cache. This prevents
-              // infinite recursion with recursive struct types.
-              let repr = adt::represent_type(cx, t);
-              let name = llvm_type_name(cx,
-                                        a_struct,
-                                        did,
-                                        substs.tps.as_slice());
-              adt::incomplete_type_of(cx, repr, name)
-          }
+          // Only create the named struct, but don't fill it in. We fill it
+          // in *after* placing it into the type cache. This prevents
+          // infinite recursion with recursive struct types.
+          let repr = adt::represent_type(cx, t);
+          let name = llvm_type_name(cx,
+                                    a_struct,
+                                    did,
+                                    substs.tps.as_slice());
+          adt::incomplete_type_of(cx, repr, name)
+      }
+      ty::ty_simd(ty, n) => {
+          Type::vector(&type_of(cx, ty), n as u64)
       }
       ty::ty_self(..) => cx.sess().unimpl("type_of: ty_self"),
       ty::ty_infer(..) => cx.sess().bug("type_of with ty_infer"),

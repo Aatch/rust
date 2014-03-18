@@ -504,6 +504,7 @@ fn trans_index<'a>(bcx: &'a Block<'a>,
         }
     };
 
+
     let vt = tvec::vec_types(bcx, base_datum.ty);
     base::maybe_name_value(bcx.ccx(), vt.llunit_size, "unit_sz");
 
@@ -516,8 +517,8 @@ fn trans_index<'a>(bcx: &'a Block<'a>,
     let expect = ccx.intrinsics.get_copy(&("llvm.expect.i1"));
     let expected = Call(bcx, expect, [bounds_check, C_i1(ccx, false)], []);
     let bcx = with_cond(bcx, expected, |bcx| {
-            controlflow::trans_fail_bounds_check(bcx, index_expr.span, ix_val, len)
-        });
+        controlflow::trans_fail_bounds_check(bcx, index_expr.span, ix_val, len)
+    });
     let elt = InBoundsGEP(bcx, base, [ix_val]);
     let elt = PointerCast(bcx, elt, vt.llunit_ty.ptr_to());
     DatumBlock(bcx, Datum(elt, vt.unit_ty, LvalueExpr))

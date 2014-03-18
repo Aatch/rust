@@ -406,6 +406,11 @@ fn parse_ty(st: &mut PState, conv: conv_did) -> ty::t {
           assert_eq!(next(st), ']');
           return ty::mk_struct(st.tcx, did, substs);
       }
+      'd' => {
+          let ty = parse_ty(st, |x, y| conv(x,y));
+          let n = parse_uint(st);
+          return ty::mk_simd(st.tcx, ty, n);
+      }
       c => { error!("unexpected char in type string: {}", c); fail!();}
     }
 }

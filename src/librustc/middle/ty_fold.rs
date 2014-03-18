@@ -184,6 +184,9 @@ pub fn super_fold_sty<T:TypeFolder>(this: &mut T,
             ty::ty_struct(did,
                           this.fold_substs(substs))
         }
+        ty::ty_simd(typ, n) => {
+            ty::ty_simd(this.fold_ty(typ), n)
+        }
         ty::ty_str(vst) => {
             ty::ty_str(this.fold_vstore(vst))
         }

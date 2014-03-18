@@ -206,6 +206,7 @@ pub fn opt_deref_kind(t: ty::t) -> Option<deref_kind> {
             Some(deref_interior(InteriorField(PositionalField(0))))
         }
 
+        ty::ty_simd(..) |
         ty::ty_vec(_, ty::vstore_fixed(_)) |
         ty::ty_str(ty::vstore_fixed(_)) => {
             Some(deref_interior(InteriorElement(element_kind(t))))

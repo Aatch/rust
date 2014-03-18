@@ -18,7 +18,7 @@ use middle::ty::{ReFree, ReScope, ReInfer, ReStatic, Region,
                  ReEmpty};
 use middle::ty::{ty_bool, ty_char, ty_bot, ty_box, ty_struct, ty_enum};
 use middle::ty::{ty_err, ty_str, ty_vec, ty_float, ty_bare_fn, ty_closure};
-use middle::ty::{ty_nil, ty_param, ty_ptr, ty_rptr, ty_self, ty_tup};
+use middle::ty::{ty_nil, ty_param, ty_ptr, ty_rptr, ty_self, ty_tup, ty_simd};
 use middle::ty::{ty_uniq, ty_trait, ty_int, ty_uint, ty_unboxed_vec, ty_infer};
 use middle::ty;
 use middle::typeck;
@@ -494,7 +494,8 @@ pub fn ty_to_str(cx: &ctxt, typ: t) -> ~str {
       ty_vec(ref mt, vs) => {
         vstore_ty_to_str(cx, mt, vs)
       }
-      ty_str(vs) => format!("{}{}", vstore_to_str(cx, vs), "str")
+      ty_str(vs) => format!("{}{}", vstore_to_str(cx, vs), "str"),
+      ty_simd(ty, n) => format!("simd <{} x {}>", ty_to_str(cx, ty), n)
     }
 }
 

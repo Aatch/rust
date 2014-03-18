@@ -321,6 +321,11 @@ fn enc_sty(w: &mut MemWriter, cx: &ctxt, st: &ty::sty) {
             enc_substs(w, cx, substs);
             mywrite!(w, "]");
         }
+        ty::ty_simd(typ, n) => {
+            mywrite!(w, "d");
+            enc_ty(w, cx, typ);
+            mywrite!(w, "{}", n);
+        }
         ty::ty_err => fail!("shouldn't encode error type")
     }
 }

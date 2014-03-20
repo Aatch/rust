@@ -538,6 +538,9 @@ pub enum Expr_ {
     // A vector literal constructed from one repeated element.
     ExprRepeat(@Expr /* element */, @Expr /* count */, Mutability),
 
+    ExprSimd(Vec<@Expr>),
+    ExprSimdRepeat(@Expr, @Expr),
+
     // No-op: used solely so we can pretty-print faithfully
     ExprParen(@Expr)
 }
@@ -828,6 +831,7 @@ pub enum Ty_ {
     // TyInfer means the type should be inferred instead of it having been
     // specified. This can appear anywhere in a type.
     TyInfer,
+    TySimd(P<Ty>, @Expr),
 }
 
 #[deriving(Clone, Eq, TotalEq, Encodable, Decodable, Hash)]

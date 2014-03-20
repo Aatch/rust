@@ -182,6 +182,7 @@ pub trait Folder {
                 TyFixedLengthVec(self.fold_ty(ty), self.fold_expr(e))
             }
             TyTypeof(expr) => TyTypeof(self.fold_expr(expr)),
+            TySimd(ty, e) => TySimd(self.fold_ty(ty), self.fold_expr(e)),
         };
         P(Ty {
             id: self.new_id(t.id),
@@ -836,7 +837,10 @@ pub fn noop_fold_expr<T: Folder>(e: @Expr, folder: &mut T) -> @Expr {
                        fields.map(|x| fold_field_(*x, folder)),
                        maybe_expr.map(|x| folder.fold_expr(x)))
         },
-        ExprParen(ex) => ExprParen(folder.fold_expr(ex))
+        ExprParen(ex) => ExprParen(folder.fold_expr(ex)),
+        ExprSimd(ref exprs) => ExprSimd(exprs.map(|&ex| folder.fold_expr(ex))),
+        ExprSimdRepeat(expr, count) => ExprSimdRepeat(
+            folder.fold_expr(expr), folder.fold_expr(count)),
     };
 
     @Expr {

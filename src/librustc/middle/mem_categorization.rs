@@ -462,6 +462,7 @@ impl<TYPER:Typer> MemCategorizationContext<TYPER> {
 
           ast::ExprParen(e) => self.cat_expr_unadjusted(e),
 
+          ast::ExprSimd(..) | ast::ExprSimdRepeat(..) |
           ast::ExprAddrOf(..) | ast::ExprCall(..) |
           ast::ExprAssign(..) | ast::ExprAssignOp(..) |
           ast::ExprFnBlock(..) | ast::ExprProc(..) | ast::ExprRet(..) |

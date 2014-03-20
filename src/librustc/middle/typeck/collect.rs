@@ -683,14 +683,7 @@ pub fn convert_struct(ccx: &CrateCtxt,
        convert_field(ccx, &tpt.generics, f);
     }
     let substs = mk_item_substs(ccx, &tpt.generics, None);
-    let selfty = if ty::lookup_simd(tcx, local_def(id)) {
-        let tcache = tcx.tcache.borrow();
-        let field = struct_def.fields.get(0);
-        let ty = tcache.get().get(&local_def(field.node.id)).ty;
-        ty::mk_simd(tcx, ty, struct_def.fields.len())
-    } else {
-        ty::mk_struct(tcx, local_def(id), substs)
-    };
+    let selfty =  ty::mk_struct(tcx, local_def(id), substs);
 
     // If this struct is enum-like or tuple-like, create the type of its
     // constructor.

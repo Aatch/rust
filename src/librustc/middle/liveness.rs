@@ -507,6 +507,7 @@ fn visit_expr(ir: &mut IrMaps, expr: &Expr) {
       }
 
       // otherwise, live nodes are not required:
+      ExprSimd(..) | ExprSimdRepeat(..) |
       ExprIndex(..) | ExprField(..) | ExprVstore(..) | ExprVec(..) |
       ExprCall(..) | ExprMethodCall(..) | ExprTup(..) |
       ExprBinary(..) | ExprAddrOf(..) |
@@ -1118,6 +1119,15 @@ impl<'a> Liveness<'a> {
             self.propagate_through_expr(element, succ)
           }
 
+          ExprSimd(ref exprs) => {
+            self.propagate_through_exprs(exprs.as_slice(), succ)
+          }
+
+          ExprSimdRepeat(element, count) => {
+            let succ = self.propagate_through_expr(count, succ);
+            self.propagate_through_expr(element, succ)
+          }
+
           ExprStruct(_, ref fields, with_expr) => {
             let succ = self.propagate_through_opt_expr(with_expr, succ);
             fields.iter().rev().fold(succ, |succ, field| {
@@ -1417,6 +1427,7 @@ fn check_expr(this: &mut Liveness, expr: &Expr) {
       }
 
       // no correctness conditions related to liveness
+      ExprSimd(..) | ExprSimdRepeat(..) |
       ExprCall(..) | ExprMethodCall(..) | ExprIf(..) | ExprMatch(..) |
       ExprWhile(..) | ExprLoop(..) | ExprIndex(..) | ExprField(..) |
       ExprVstore(..) | ExprVec(..) | ExprTup(..) |

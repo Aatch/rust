@@ -575,6 +575,16 @@ pub fn super_tys<C:Combine>(this: &C, a: ty::t, b: ty::t) -> cres<ty::t> {
         })
       }
 
+      (&ty::ty_simd(a_ty, a_n), &ty::ty_simd(b_ty, b_n)) => {
+        if a_n == b_n {
+            this.tys(a_ty, b_ty).and_then(|ty| {
+                Ok(ty::mk_simd(tcx, ty, a_n))
+            })
+        } else {
+            Err(ty::terr_simd_size(expected_found(this, a_n, b_n)))
+        }
+      }
+
       _ => Err(ty::terr_sorts(expected_found(this, a, b)))
     };
 

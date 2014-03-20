@@ -351,6 +351,10 @@ impl<'a> CFGBuilder<'a> {
                 self.straightline(expr, pred, elems.as_slice())
             }
 
+            ast::ExprSimd(ref elems) => {
+                self.straightline(expr, pred, elems.as_slice())
+            }
+
             ast::ExprCall(func, ref args) => {
                 self.call(expr, pred, func, args.as_slice())
             }
@@ -380,6 +384,10 @@ impl<'a> CFGBuilder<'a> {
             }
 
             ast::ExprRepeat(elem, count, _) => {
+                self.straightline(expr, pred, [elem, count])
+            }
+
+            ast::ExprSimdRepeat(elem, count) => {
                 self.straightline(expr, pred, [elem, count])
             }
 

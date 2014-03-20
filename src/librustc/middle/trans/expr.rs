@@ -57,6 +57,7 @@ use middle::trans::machine;
 use middle::trans::meth;
 use middle::trans::inline;
 use middle::trans::tvec;
+use middle::trans::simd;
 use middle::trans::type_of;
 use middle::trans::write_guard;
 use middle::ty::struct_fields;
@@ -729,6 +730,9 @@ fn trans_rvalue_dps_unadjusted<'a>(bcx: &'a Block<'a>,
         }
         ast::ExprVec(..) | ast::ExprRepeat(..) => {
             tvec::trans_fixed_vstore(bcx, expr, expr, dest)
+        }
+        ast::ExprSimd(..) | ast::ExprSimdRepeat(..) => {
+            simd::trans_simd(bcx, expr, dest)
         }
         ast::ExprFnBlock(decl, body) |
         ast::ExprProc(decl, body) => {

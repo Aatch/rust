@@ -544,6 +544,15 @@ impl<'a> VisitContext<'a> {
                 self.consume_expr(count);
             }
 
+            ExprSimd(ref exprs) => {
+                self.consume_exprs(exprs.as_slice());
+            }
+
+            ExprSimdRepeat(base, count) => {
+                self.consume_expr(base);
+                self.consume_expr(count);
+            }
+
             ExprFnBlock(ref decl, body) |
             ExprProc(ref decl, body) => {
                 for a in decl.inputs.iter() {

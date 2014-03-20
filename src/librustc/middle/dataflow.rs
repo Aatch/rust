@@ -571,6 +571,15 @@ impl<'a, 'b, O:DataFlowOperator> PropagationContext<'a, 'b, O> {
                 self.walk_expr(r, in_out, loop_scopes);
             }
 
+            ast::ExprSimd(ref exprs) => {
+                self.walk_exprs(exprs.as_slice(), in_out, loop_scopes)
+            }
+
+            ast::ExprSimdRepeat(l, r) => {
+                self.walk_expr(l, in_out, loop_scopes);
+                self.walk_expr(r, in_out, loop_scopes);
+            }
+
             ast::ExprStruct(_, ref fields, with_expr) => {
                 for field in fields.iter() {
                     self.walk_expr(field.expr, in_out, loop_scopes);

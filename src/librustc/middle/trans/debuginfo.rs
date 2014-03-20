@@ -2553,6 +2553,7 @@ fn populate_scope_map(cx: &CrateContext,
             }
 
             ast::ExprVec(ref init_expressions, _) |
+            ast::ExprSimd(ref init_expressions)   |
             ast::ExprTup(ref init_expressions)    => {
                 for ie in init_expressions.iter() {
                     walk_expr(cx, *ie, scope_stack, scope_map);
@@ -2560,6 +2561,7 @@ fn populate_scope_map(cx: &CrateContext,
             }
 
             ast::ExprAssign(sub_exp1, sub_exp2)    |
+            ast::ExprSimdRepeat(sub_exp1, sub_exp2)|
             ast::ExprRepeat(sub_exp1, sub_exp2, _) => {
                 walk_expr(cx, sub_exp1, scope_stack, scope_map);
                 walk_expr(cx, sub_exp2, scope_stack, scope_map);

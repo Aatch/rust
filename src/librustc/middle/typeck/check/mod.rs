@@ -536,10 +536,6 @@ pub fn check_struct(ccx: &CrateCtxt, id: ast::NodeId, span: Span) {
 
     // Check that the struct is instantiable
     check_instantiable(tcx, span, id);
-
-    if ty::lookup_simd(tcx, local_def(id)) {
-        check_simd(tcx, span, id);
-    }
 }
 
 pub fn check_item(ccx: &CrateCtxt, it: &ast::Item) {
@@ -3085,6 +3081,29 @@ fn check_expr_with_unifier(fcx: &FnCtxt,
             fcx.write_ty(id, t);
         }
       }
+      ast::ExprSimd(ref args) => {
+          let t: ty::t = fcx.infcx().next_ty_var();
+          for e in args.iter() {
+              check_expr_has_type(fcx, *e, t);
+          }
+          let typ = ty::mk_simd(tcx, t, args.len());
+          fcx.write_ty(id, typ);
+      }
+      ast::ExprSimdRepeat(element, count_expr) => {
+          check_expr_with_hint(fcx, count_expr, ty::mk_uint());
+          let count = ty::eval_repeat_count(fcx, count_expr);
+          let t: ty::t = fcx.infcx().next_ty_var();
+          check_expr_has_type(fcx, element, t);
+          let element_ty = fcx.expr_ty(element);
+          if ty::type_is_error(element_ty) {
+              fcx.write_error(id);
+          } else if ty::type_is_bot(element_ty) {
+              fcx.write_bot(id);
+          } else {
+              let t = ty::mk_simd(tcx, t, count);
+              fcx.write_ty(id, t);
+          }
+      }
       ast::ExprTup(ref elts) => {
         let flds = unpack_expected(fcx, expected, |sty| {
             match *sty {
@@ -3441,28 +3460,6 @@ pub fn check_instantiable(tcx: &ty::ctxt,
                   without an instance of itself; \
                   consider using `Option<{}>`",
                                    ppaux::ty_to_str(tcx, item_ty)));
-    }
-}
-
-pub fn check_simd(tcx: &ty::ctxt, sp: Span, id: ast::NodeId) {
-    let t = ty::node_id_to_type(tcx, id);
-    if ty::type_needs_subst(t) {
-        tcx.sess.span_err(sp, "SIMD vector cannot be generic");
-        return;
-    }
-    match ty::get(t).sty {
-        ty::ty_simd(t, n) => {
-            if n == 0 {
-                tcx.sess.span_err(sp, "SIMD vector cannot be empty");
-                return;
-            }
-            if !ty::type_is_machine(t) {
-                tcx.sess.span_err(sp, "SIMD vector element type should be \
-                                       machine type");
-                return;
-            }
-        }
-        _ => ()
     }
 }
 

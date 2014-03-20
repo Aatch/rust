@@ -163,6 +163,8 @@ fn check_expr(v: &mut CheckCrateVisitor, e: &Expr, is_const: bool) {
           ExprField(..) |
           ExprIndex(..) |
           ExprTup(..) |
+          ExprSimd(..) |
+          ExprSimdRepeat(..) |
           ExprRepeat(..) |
           ExprStruct(..) => { }
           ExprAddrOf(..) => {
@@ -173,7 +175,6 @@ fn check_expr(v: &mut CheckCrateVisitor, e: &Expr, is_const: bool) {
           ExprVstore(_, ExprVstoreUniq) => {
               v.tcx.sess.span_err(e.span, "cannot allocate vectors in constant expressions")
           },
-
           _ => {
             v.tcx.sess.span_err(e.span,
                                 "constant contains unimplemented expression type");

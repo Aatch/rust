@@ -809,6 +809,7 @@ pub enum type_err {
     terr_tuple_size(expected_found<uint>),
     terr_ty_param_size(expected_found<uint>),
     terr_record_size(expected_found<uint>),
+    terr_simd_size(expected_found<uint>),
     terr_record_mutability,
     terr_record_fields(expected_found<Ident>),
     terr_arg_count,
@@ -1191,7 +1192,7 @@ pub fn mk_t(cx: &ctxt, st: sty) -> t {
         flags |= get(mt.ty).flags;
       }
       &ty_nil | &ty_bool | &ty_char | &ty_int(_) | &ty_float(_) | &ty_uint(_) |
-      &ty_str(_) | &ty_simd(..) => {}
+      &ty_str(_) => {}
       // You might think that we could just return ty_err for
       // any type containing ty_err as a component, and get
       // rid of the has_ty_err flag -- likewise for ty_bot (with
@@ -1220,6 +1221,9 @@ pub fn mk_t(cx: &ctxt, st: sty) -> t {
       &ty_vec(ref m, _) | &ty_ptr(ref m) |
       &ty_unboxed_vec(ref m) => {
         flags |= get(m.ty).flags;
+      }
+      &ty_simd(ty, _) => {
+        flags |= get(ty).flags;
       }
       &ty_rptr(r, ref m) => {
         flags |= rflags(r);
@@ -3330,7 +3334,9 @@ pub fn expr_kind(tcx: &ctxt,
         ast::ExprRepeat(..) |
         ast::ExprVstore(_, ast::ExprVstoreSlice) |
         ast::ExprVstore(_, ast::ExprVstoreMutSlice) |
-        ast::ExprVec(..) => {
+        ast::ExprVec(..) |
+        ast::ExprSimd(..) |
+        ast::ExprSimdRepeat(..) => {
             RvalueDpsExpr
         }
 
@@ -3541,6 +3547,11 @@ pub fn type_err_to_str(cx: &ctxt, err: &type_err) -> ~str {
             format!("expected a record with {} fields \
                   but found one with {} fields",
                  values.expected, values.found)
+        }
+        terr_simd_size(values) => {
+            format!("expected an simd vector with {} elements \
+                but found one with {} elements",
+                values.expected, values.found)
         }
         terr_record_mutability => {
             ~"record elements differ in mutability"

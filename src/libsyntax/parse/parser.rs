@@ -51,7 +51,7 @@ use ast::{SelfRegion, SelfStatic, SelfUniq, SelfValue};
 use ast::{TokenTree, TraitMethod, TraitRef, TTDelim, TTSeq, TTTok};
 use ast::{TTNonterminal, TupleVariantKind, Ty, Ty_, TyBot, TyBox};
 use ast::{TypeField, TyFixedLengthVec, TyClosure, TyBareFn, TyTypeof};
-use ast::{TyInfer, TypeMethod};
+use ast::{TyInfer, TypeMethod, TySimd};
 use ast::{TyNil, TyParam, TyParamBound, TyPath, TyPtr, TyRptr};
 use ast::{TyTup, TyU32, TyUniq, TyVec, UnUniq};
 use ast::{UnnamedField, UnsafeBlock, UnsafeFn, ViewItem};
@@ -1282,12 +1282,31 @@ impl<'a> Parser<'a> {
             self.parse_proc_type()
         } else if self.token == token::MOD_SEP
             || is_ident_or_path(&self.token) {
-            // NAMED TYPE
-            let PathAndBounds {
-                path,
-                bounds
-            } = self.parse_path(LifetimeAndTypesAndBounds);
-            TyPath(path, bounds, ast::DUMMY_NODE_ID)
+
+            let is_simd = self.look_ahead(1, |t| *t == token::NOT) &&
+                match self.token {
+                token::IDENT(_, false) => {
+                    self.this_token_to_str() == ~"simd"
+                },
+                _ => false
+            };
+            if is_simd {
+                self.bump(); self.bump();
+                self.expect(&token::LBRACKET);
+                let t = self.parse_ty(false);
+                self.expect(&token::COMMA);
+                self.expect(&token::DOTDOT);
+                let e = self.parse_expr();
+                self.expect(&token::RBRACKET);
+                TySimd(t, e)
+            } else {
+                // NAMED TYPE
+                let PathAndBounds {
+                    path,
+                    bounds
+                } = self.parse_path(LifetimeAndTypesAndBounds);
+                TyPath(path, bounds, ast::DUMMY_NODE_ID)
+            }
         } else if self.eat(&token::UNDERSCORE) {
             // TYPE TO BE INFERRED
             TyInfer
@@ -1927,7 +1946,7 @@ impl<'a> Parser<'a> {
                 // MACRO INVOCATION expression
                 self.bump();
                 match self.token {
-                    token::LPAREN | token::LBRACE => {}
+                    token::LPAREN | token::LBRACE | token::LBRACKET => {}
                     _ => self.fatal("expected open delimiter")
                 };
 
@@ -3183,7 +3202,8 @@ impl<'a> Parser<'a> {
             let pth = self.parse_path(NoTypesAllowed).path;
             self.bump();
 
-            let id = if self.token == token::LPAREN || self.token == token::LBRACE {
+            let id = if self.token == token::LPAREN || self.token == token::LBRACE
+                        || self.token == token::LBRACKET {
                 token::special_idents::invalid // no special identifier
             } else {
                 self.parse_ident()
@@ -3195,6 +3215,7 @@ impl<'a> Parser<'a> {
             let (bra, ket) = match self.token {
                 token::LPAREN => (token::LPAREN, token::RPAREN),
                 token::LBRACE => (token::LBRACE, token::RBRACE),
+                token::LBRACKET => (token::LBRACKET, token::RBRACKET),
                 _ => {
                     // we only expect an ident if we didn't parse one
                     // above.

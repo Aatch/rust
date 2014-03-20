@@ -510,6 +510,13 @@ impl<'a> State<'a> {
             ast::TyInfer => {
                 try!(word(&mut self.s, "_"));
             }
+            ast::TySimd(ty, v) => {
+                try!(word(&mut s.s, "simd!["));
+                try!(print_type(s, ty));
+                try!(word(&mut s.s, ", .."));
+                try!(print_expr(s, v));
+                try!(word(&mut s.s, "]"));
+            }
         }
         self.end()
     }
@@ -1452,6 +1459,23 @@ impl<'a> State<'a> {
                 try!(self.pclose());
             }
             ast::ExprMac(ref m) => try!(self.print_mac(m)),
+          ast::ExprSimd(ref exprs) => {
+              try!(ibox(s, indent_unit));
+              try!(word(&mut s.s, "simd!["));
+              try!(commasep_exprs(s, Inconsistent, exprs.as_slice()));
+              try!(word(&mut s.s, "]"));
+              try!(end(s));
+          }
+          ast::ExprSimdRepeat(expr, count) => {
+              try!(ibox(s, indent_unit));
+              try!(word(&mut s.s, "simd!["));
+              try!(print_expr(s, expr));
+              try!(word(&mut s.s, ","));
+              try!(word(&mut s.s, ".."));
+              try!(print_expr(s, count));
+              try!(word(&mut s.s, "]"));
+              try!(end(s));
+          }
             ast::ExprParen(e) => {
                 try!(self.popen());
                 try!(self.print_expr(e));

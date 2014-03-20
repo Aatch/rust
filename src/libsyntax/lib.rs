@@ -99,4 +99,6 @@ pub mod ext {
     pub mod source_util;
 
     pub mod trace_macros;
+
+    pub mod simd;
 }

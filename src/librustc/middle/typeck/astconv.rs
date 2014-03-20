@@ -629,6 +629,27 @@ pub fn ast_ty_to_ty<AC:AstConv, RS:RegionScope>(
                     }
                 }
             }
+            ast::TySimd(ty, e) => {
+                match const_eval::eval_const_expr_partial(&tcx, e) {
+                    Ok(ref r) => {
+                        match *r {
+                            const_eval::const_int(i) =>
+                                ty::mk_simd(tcx, ast_ty_to_ty(this, rscope, ty),i as uint),
+                            const_eval::const_uint(i) =>
+                                ty::mk_simd(tcx, ast_ty_to_ty(this, rscope, ty),i as uint),
+                            _ => {
+                                tcx.sess.span_fatal(
+                                    ast_ty.span, "expected constant expr for SIMD vector length");
+                            }
+                        }
+                    }
+                    Err(ref r) => {
+                        tcx.sess.span_fatal(
+                            ast_ty.span,
+                            format!("expected constant expr for SIMD vector length: {}", *r));
+                    }
+                }
+            }
             ast::TyTypeof(_e) => {
                 tcx.sess.span_bug(ast_ty.span, "typeof is reserved but unimplemented");
             }

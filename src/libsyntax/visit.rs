@@ -364,6 +364,10 @@ pub fn walk_ty<E: Clone, V: Visitor<E>>(visitor: &mut V, typ: &Ty, env: E) {
         TyTypeof(expression) => {
             visitor.visit_expr(expression, env)
         }
+        TySimd(ty, expr) => {
+            visitor.visit_ty(ty, env.clone());
+            visitor.visit_expr(expr, env)
+        }
         TyNil | TyBot | TyInfer => {}
     }
 }
@@ -753,9 +757,16 @@ pub fn walk_expr<E: Clone, V: Visitor<E>>(visitor: &mut V, expression: &Expr, en
                 visitor.visit_expr(output, env.clone())
             }
         }
+        ExprSimd(ref exprs) => {
+            walk_exprs(visitor, exprs.as_slice(), env.clone())
+        }
+        ExprSimdRepeat(expr, count) => {
+            visitor.visit_expr(expr, env.clone());
+            visitor.visit_expr(count, env.clone())
+        }
     }
 
-    visitor.visit_expr_post(expression, env.clone())
+    visitor.visit_expr_post(expression, env)
 }
 
 pub fn walk_arm<E: Clone, V: Visitor<E>>(visitor: &mut V, arm: &Arm, env: E) {

@@ -188,13 +188,6 @@ impl<'a> Visitor<()> for Context<'a> {
                 }
             }
 
-            ast::ItemStruct(..) => {
-                if attr::contains_name(i.attrs.as_slice(), "simd") {
-                    self.gate_feature("simd", i.span,
-                                      "SIMD types are experimental and possibly buggy");
-                }
-            }
-
             _ => {}
         }
 
@@ -261,6 +254,10 @@ impl<'a> Visitor<()> for Context<'a> {
 
             },
             ast::TyBox(_) => { self.gate_box(t.span); }
+            ast::TySimd(..) => {
+                self.gate_feature("simd", t.span,
+                    "SIMD types are experimental and possibly buggy");
+            }
             _ => {}
         }
 
@@ -271,6 +268,10 @@ impl<'a> Visitor<()> for Context<'a> {
         match e.node {
             ast::ExprUnary(ast::UnBox, _) => {
                 self.gate_box(e.span);
+            }
+            ast::ExprSimd(..) | ast::ExprSimdRepeat(..) => {
+                self.gate_feature("simd", e.span,
+                    "SIMD types are experimental and possibly buggy");
             }
             _ => {}
         }

@@ -1439,6 +1439,96 @@ pub fn lookup_field_ty(tcx: &ty::ctxt,
     o_field.map(|f| ty::lookup_field_type(tcx, class_id, f.id, substs))
 }
 
+pub fn lookup_simd_field(tcx: ty::ctxt,
+                         span: Span,
+                         simd_ty: ty::t,
+                         field: ast::Name) -> Option<ty::t> {
+
+    fn num_char_to_pos(c: char) -> Option<uint> {
+        match c {
+            '0'..'9' => Some((c as uint) - ('0' as uint)),
+            'a'..'f' => Some((c as uint) - ('a' as uint)),
+            _ => None
+        }
+    }
+
+    fn geom_char_to_pos(c: char) -> Option<uint> {
+        match c {
+            'x' => Some(0),
+            'y' => Some(1),
+            'z' => Some(2),
+            'w' => Some(3),
+            _ => None
+        }
+    }
+
+    match ty::get(simd_ty).sty {
+        ty::ty_simd(ty, len) => {
+            let fname = token::get_name(field);
+            let field_name = fname.get();
+            let mut chars = field_name.chars();
+
+            match chars.next() {
+                Some('s') => {
+                    for c in chars {
+                        match num_char_to_pos(c) {
+                            Some(i) => if i >= len {
+                                tcx.sess.span_err(span, format!(
+                                    "element `{}` out of range for SIMD vector of length `{}`",
+                                                c, len));
+                                return None;
+                            },
+                            None => {
+                                tcx.sess.span_err(span,
+                                    format!("Invalid character `{}` for SIMD shuffle access", c));
+                                return None;
+                            }
+                        }
+                    }
+                    let new_len = field_name.len() - 1;
+                    Some(ty::mk_simd(tcx, ty, new_len))
+                }
+                Some(c @ 'w'..'z') => {
+                    match geom_char_to_pos(c) {
+                        Some(i) => if i >= len {
+                            tcx.sess.span_err(span, format!(
+                                "element `{}` out of range for SIMD vector of length `{}`",
+                                            c, len));
+                           return None;
+                        },
+                        None => {
+                            tcx.sess.span_err(span,
+                                format!("Invalid character `{}` for SIMD shuffle access", c));
+                            return None;
+                        }
+                    }
+                    for c in chars {
+                        match geom_char_to_pos(c) {
+                            Some(i) => if i >= len {
+                                tcx.sess.span_err(span, format!(
+                                    "element `{}` out of range for SIMD vector of length `{}`",
+                                                c, len));
+                                return None;
+                            },
+                            None => {
+                                tcx.sess.span_err(span,
+                                    format!("Invalid character `{}` for SIMD shuffle access", c));
+                                return None;
+                            }
+                        }
+                    }
+                    let new_len = field_name.len();
+                    Some(ty::mk_simd(tcx, ty, new_len))
+                }
+                _ => None
+            }
+
+        }
+        _ => tcx.sess.span_bug(span, "lookup_simd_field: `simd_ty` not an SIMD type")
+    }
+
+}
+
 // Controls whether the arguments are automatically referenced. This is useful
 // for overloaded binary and unary operators.
 pub enum DerefArgs {
@@ -2275,6 +2365,9 @@ fn check_expr_with_unifier(fcx: &FnCtxt,
                         debug!("struct named {}", ppaux::ty_to_str(tcx, base_t));
                         let fields = ty::lookup_struct_fields(tcx, base_id);
                         lookup_field_ty(tcx, base_id, fields.as_slice(), field, &(*substs))
+                    }
+                    ty::ty_simd(..) => {
+                        lookup_simd_field(tcx, expr.span, base_t, field)
                     }
                     _ => None
                 }

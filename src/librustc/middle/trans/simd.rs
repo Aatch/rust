@@ -9,17 +9,21 @@
 // except according to those terms.
 
 use syntax::ast;
+use syntax::parse::token;
 use middle::trans::common::*;
 use middle::trans::datum::*;
 use middle::trans::expr::{Dest, Ignore, SaveIn};
 use middle::trans::expr;
 use middle::trans::cleanup::CleanupMethods;
 use middle::trans::build::{InsertElement,GEPi,VectorSplat,Store,FCmp,ICmp};
-use middle::trans::build::{ExtractElement,And,ZExt};
+use middle::trans::build::{ExtractElement,And,ZExt,ShuffleVector,Load};
 use middle::ty;
+use middle::trans::type_of;
 use lib;
-use lib::llvm::{ValueRef};
+use lib::llvm::{ValueRef,llvm};
 use middle::trans::type_::Type;
+
+use std::vec_ng::Vec;
 
 pub fn trans_simd<'a>(bcx: &'a Block<'a>,
                       expr: &ast::Expr,
@@ -98,3 +102,58 @@ pub fn trans_simd_eqop<'a>(bcx: &'a Block<'a>,
     ZExt(bcx, res, Type::i8())
 }
 
+pub fn trans_shuffle<'a>(bcx: &'a Block<'a>,
+                         base: Datum<Lvalue>,
+                         field: ast::Ident) -> DatumBlock<'a, Expr> {
+    let ccx = bcx.ccx();
+
+    let field = token::get_ident(field);
+    let name = field.get();
+    let (len, mask) = field_name_to_mask(name);
+
+    let sub_ty = ty::simd_type(bcx.tcx(), base.ty);
+    let elt_ty = type_of::type_of(bcx.ccx(), sub_ty);
+    let num_elts = ty::simd_size(bcx.tcx(), base.ty);
+
+    let vec = Load(bcx, base.to_llref());
+    let vec2 = unsafe {
+        llvm::LLVMGetUndef(Type::vector(&elt_ty, num_elts as u64).to_ref())
+    };
+
+    debug!("trans_shuffle [{}, {}, {}]",
+        ccx.tn.val_to_str(vec), ccx.tn.val_to_str(vec2), ccx.tn.val_to_str(mask));
+
+    let shuffled = ShuffleVector(bcx, vec, vec2, mask);
+
+    let datum = Datum(shuffled, ty::mk_simd(bcx.tcx(), sub_ty, len),
+        RvalueExpr(Rvalue(ByValue)));
+
+    DatumBlock { datum: datum, bcx: bcx }
+}
+
+fn field_name_to_mask(mut name: &str) -> (uint, ValueRef) {
+
+    if name[0] == 0x73 { // if it begins with a 's'
+        name = name.slice_from(1);
+    }
+
+    let vec : Vec<ValueRef> = name.chars().map(|c| {
+        match c {
+            '0'..'9' => {
+                let val = (c as uint) - ('0' as uint);
+                C_i32(val as i32)
+            }
+            'a'..'f' => {
+                let val = (c as uint) - ('a' as uint);
+                C_i32(val as i32)
+            }
+            'x' => C_i32(0),
+            'y' => C_i32(1),
+            'z' => C_i32(2),
+            'w' => C_i32(3),
+            _ => fail!("Invalid position in shuffle access")
+        }
+    }).collect();
+
+    (vec.len(), C_vector(vec.as_slice()))
+}

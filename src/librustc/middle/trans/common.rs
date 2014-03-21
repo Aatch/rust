@@ -654,6 +654,12 @@ pub fn C_array(ty: Type, elts: &[ValueRef]) -> ValueRef {
     }
 }
 
+pub fn C_vector(elts: &[ValueRef]) -> ValueRef {
+    unsafe {
+        return llvm::LLVMConstVector(elts.as_ptr(), elts.len() as c_uint);
+    }
+}
+
 pub fn C_bytes(ccx: &CrateContext, bytes: &[u8]) -> ValueRef {
     unsafe {
         let ptr = bytes.as_ptr() as *c_char;

@@ -464,14 +464,19 @@ fn trans_rec_field<'a>(bcx: &'a Block<'a>,
     let _icx = push_ctxt("trans_rec_field");
 
     let base_datum = unpack_datum!(bcx, trans_to_lvalue(bcx, base, "field"));
-    let repr = adt::represent_type(bcx.ccx(), base_datum.ty);
-    with_field_tys(bcx.tcx(), base_datum.ty, None, |discr, field_tys| {
-            let ix = ty::field_idx_strict(bcx.tcx(), field.name, field_tys);
-            let d = base_datum.get_element(
-                field_tys[ix].mt.ty,
-                |srcval| adt::trans_field_ptr(bcx, repr, srcval, discr, ix));
-            DatumBlock { datum: d.to_expr_datum(), bcx: bcx }
-        })
+
+    if ty::type_is_simd(bcx.tcx(), base_datum.ty) {
+        simd::trans_shuffle(bcx, base_datum, field)
+    } else {
+        let repr = adt::represent_type(bcx.ccx(), base_datum.ty);
+        with_field_tys(bcx.tcx(), base_datum.ty, None, |discr, field_tys| {
+                let ix = ty::field_idx_strict(bcx.tcx(), field.name, field_tys);
+                let d = base_datum.get_element(
+                    field_tys[ix].mt.ty,
+                    |srcval| adt::trans_field_ptr(bcx, repr, srcval, discr, ix));
+                DatumBlock { datum: d.to_expr_datum(), bcx: bcx }
+            })
+    }
 }
 
 fn trans_index<'a>(bcx: &'a Block<'a>,

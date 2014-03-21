@@ -2714,6 +2714,7 @@ pub fn index(t: t) -> Option<mt> {
     match get(t).sty {
         ty_vec(mt, _) => Some(mt),
         ty_str(_) => Some(mt {ty: mk_u8(), mutbl: ast::MutImmutable}),
+        ty_simd(ty, _) => Some(mt { ty: ty, mutbl: ast::MutImmutable}),
         _ => None
     }
 }

@@ -506,23 +506,37 @@ fn trans_index<'a>(bcx: &'a Block<'a>,
     };
 
 
-    let vt = tvec::vec_types(bcx, base_datum.ty);
-    base::maybe_name_value(bcx.ccx(), vt.llunit_size, "unit_sz");
+    if ty::type_is_simd(bcx.tcx(), base_datum.ty) {
+        let len = C_uint(bcx.ccx(), ty::simd_size(bcx.tcx(), base_datum.ty));
+        let bounds_check = ICmp(bcx, lib::llvm::IntUGE, ix_val, len);
+        let expect = ccx.intrinsics.get_copy(&("llvm.expect.i1"));
+        let expected = Call(bcx, expect, [bounds_check, C_i1(false)], []);
+        let bcx = with_cond(bcx, expected, |bcx| {
+            controlflow::trans_fail_bounds_check(bcx, index_expr.span, ix_val, len)
+        });
+        let base = base_datum.to_llref();
+        let elt = InBoundsGEP(bcx, base, [C_integral(val_ty(ix_val), 0, false), ix_val]);
 
-    let (base, len) = base_datum.get_vec_base_and_len(bcx);
+        DatumBlock(bcx, Datum(elt, ty::simd_type(bcx.tcx(), base_datum.ty), LvalueExpr))
+    } else {
+        let vt = tvec::vec_types(bcx, base_datum.ty);
+        base::maybe_name_value(bcx.ccx(), vt.llunit_size, "unit_sz");
 
-    debug!("trans_index: base {}", bcx.val_to_str(base));
-    debug!("trans_index: len {}", bcx.val_to_str(len));
+        let (base, len) = base_datum.get_vec_base_and_len(bcx);
 
-    let bounds_check = ICmp(bcx, lib::llvm::IntUGE, ix_val, len);
-    let expect = ccx.intrinsics.get_copy(&("llvm.expect.i1"));
-    let expected = Call(bcx, expect, [bounds_check, C_i1(ccx, false)], []);
-    let bcx = with_cond(bcx, expected, |bcx| {
-        controlflow::trans_fail_bounds_check(bcx, index_expr.span, ix_val, len)
-    });
-    let elt = InBoundsGEP(bcx, base, [ix_val]);
-    let elt = PointerCast(bcx, elt, vt.llunit_ty.ptr_to());
-    DatumBlock(bcx, Datum(elt, vt.unit_ty, LvalueExpr))
+        debug!("trans_index: base {}", bcx.val_to_str(base));
+        debug!("trans_index: len {}", bcx.val_to_str(len));
+
+        let bounds_check = ICmp(bcx, lib::llvm::IntUGE, ix_val, len);
+        let expect = ccx.intrinsics.get_copy(&("llvm.expect.i1"));
+        let expected = Call(bcx, expect, [bounds_check, C_i1(false)], []);
+        let bcx = with_cond(bcx, expected, |bcx| {
+            controlflow::trans_fail_bounds_check(bcx, index_expr.span, ix_val, len)
+        });
+        let elt = InBoundsGEP(bcx, base, [ix_val]);
+        let elt = PointerCast(bcx, elt, vt.llunit_ty.ptr_to());
+        DatumBlock(bcx, Datum(elt, vt.unit_ty, LvalueExpr))
+    }
 }
 
 fn trans_def<'a>(bcx: &'a Block<'a>,

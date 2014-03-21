@@ -101,7 +101,7 @@ use middle::typeck::check::regionmanip::replace_late_bound_regions_in_fn_sig;
 use middle::typeck::check::regionmanip::relate_free_regions;
 use middle::typeck::check::vtable::VtableContext;
 use middle::typeck::CrateCtxt;
-use middle::typeck::infer::{resolve_type, force_tvar};
+use middle::typeck::infer::{resolve_type, force_tvar, resolve_nested_tvar};
 use middle::typeck::infer;
 use middle::typeck::rscope::RegionScope;
 use middle::typeck::{lookup_def_ccx};
@@ -3821,15 +3821,29 @@ pub fn instantiate_path(fcx: &FnCtxt,
 // resolution is possible, then an error is reported.
 pub fn structurally_resolved_type(fcx: &FnCtxt, sp: Span, tp: ty::t) -> ty::t {
     match infer::resolve_type(fcx.infcx(), tp, force_tvar) {
-        Ok(t_s) if !ty::type_is_ty_var(t_s) => t_s,
-        _ => {
-            fcx.type_error_message(sp, |_actual| {
-                ~"the type of this value must be known in this context"
-            }, tp, None);
-            demand::suptype(fcx, sp, ty::mk_err(), tp);
-            tp
+        Ok(t_s) if !ty::type_is_ty_var(t_s) => {
+            // if t_s needs inference and it's an SIMD type, then we should
+            // infer it's subtype.
+            // Since simd falls into a weird gap between structural and primitive
+            // type, we generally need to know the underlying type in order to do
+            // anything interesting
+            if ty::type_is_simd(fcx.tcx(), t_s) && ty::type_needs_infer(t_s) {
+                match infer::resolve_type(fcx.infcx(), t_s, resolve_nested_tvar) {
+                    Ok(t_s) => return t_s,
+                    _ => ()
+                }
+            } else {
+                return t_s;
+            }
         }
+        _ => ()
     }
+
+    fcx.type_error_message(sp, |_actual| {
+        ~"the type of this value must be known in this context"
+    }, tp, None);
+    demand::suptype(fcx, sp, ty::mk_err(), tp);
+    tp
 }
 
 // Returns the one-level-deep structure of the given type.

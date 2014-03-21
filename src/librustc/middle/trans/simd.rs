@@ -58,7 +58,7 @@ pub fn trans_simd<'a>(bcx: &'a Block<'a>,
                     let elem = unpack_datum!(bcx, expr::trans(bcx, elem));
                     assert!(!ty::type_moves_by_default(bcx.tcx(), elem.ty));
 
-                    let vec = VectorSplat(bcx, count, elem.val);
+                    let vec = VectorSplat(bcx, count, elem.to_llscalarish(bcx));
                     Store(bcx, vec, lldest);
                     return bcx;
                 }

@@ -75,12 +75,12 @@ fn get_base_type(inference_context: &InferCtxt,
     }
 
     match get(resolved_type).sty {
-        ty_simd(..) |
         ty_enum(..) | ty_trait(..) | ty_struct(..) => {
             debug!("(getting base type) found base type");
             Some(resolved_type)
         }
 
+        ty_simd(..) |
         ty_nil | ty_bot | ty_bool | ty_char | ty_int(..) | ty_uint(..) | ty_float(..) |
         ty_str(..) | ty_vec(..) | ty_bare_fn(..) | ty_closure(..) | ty_tup(..) |
         ty_infer(..) | ty_param(..) | ty_self(..) |

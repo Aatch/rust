@@ -495,7 +495,7 @@ pub fn ty_to_str(cx: &ctxt, typ: t) -> ~str {
         vstore_ty_to_str(cx, mt, vs)
       }
       ty_str(vs) => format!("{}{}", vstore_to_str(cx, vs), "str"),
-      ty_simd(ty, n) => format!("simd <{} x {}>", ty_to_str(cx, ty), n)
+      ty_simd(ty, n) => format!("simd![{},..{}]", ty_to_str(cx, ty), n)
     }
 }
 

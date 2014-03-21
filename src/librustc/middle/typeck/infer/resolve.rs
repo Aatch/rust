@@ -159,6 +159,11 @@ impl<'a> ResolveState<'a> {
             return typ;
         }
 
+        match ty::get(typ).sty {
+            ty::ty_simd(..) => return ty_fold::super_fold_ty(self, typ),
+            _ => ()
+        };
+
         if self.type_depth > 0 && !self.should(resolve_nested_tvar) {
             return typ;
         }

@@ -629,19 +629,26 @@ pub fn ast_ty_to_ty<AC:AstConv, RS:RegionScope>(
                     }
                 }
             }
-            ast::TySimd(ty, e) => {
+            ast::TySimd(subty, e) => {
                 match const_eval::eval_const_expr_partial(&tcx, e) {
                     Ok(ref r) => {
-                        match *r {
-                            const_eval::const_int(i) =>
-                                ty::mk_simd(tcx, ast_ty_to_ty(this, rscope, ty),i as uint),
-                            const_eval::const_uint(i) =>
-                                ty::mk_simd(tcx, ast_ty_to_ty(this, rscope, ty),i as uint),
+                        let i = match *r {
+                            const_eval::const_int(i) => i as uint,
+                            const_eval::const_uint(i) => i as uint,
                             _ => {
                                 tcx.sess.span_fatal(
                                     ast_ty.span, "expected constant expr for SIMD vector length");
                             }
-                        }
+                        };
+                        let ty = match ast_ty_to_prim_ty(tcx, subty) {
+                            Some(typ) => typ,
+                            None => {
+                                tcx.sess.span_err(subty.span,
+                                    "SIMD vectors may only contain primitive types");
+                                ty::mk_err()
+                            }
+                        };
+                        ty::mk_simd(tcx, ty, i)
                     }
                     Err(ref r) => {
                         tcx.sess.span_fatal(

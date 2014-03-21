@@ -1351,12 +1351,22 @@ fn trans_eager_binop<'a>(
             C_bool(bcx.ccx(), false)
         } else {
             if !ty::type_is_scalar(rhs_t) {
-                bcx.tcx().sess.span_bug(binop_expr.span,
-                                        "non-scalar comparison");
+                if ty::type_is_simd(tcx, rhs_t) {
+                    if op == ast::BiEq {
+                        simd::trans_simd_eqop(bcx, lhs, rhs, rhs_t)
+                    } else {
+                        bcx.tcx().sess.span_bug(binop_expr.span,
+                                                "Inequality on SIMD vector");
+                    }
+                } else {
+                    bcx.tcx().sess.span_bug(binop_expr.span,
+                                            "non-scalar comparison");
+                }
+            } else {
+                let cmpr = base::compare_scalar_types(bcx, lhs, rhs, rhs_t, op);
+                bcx = cmpr.bcx;
+                ZExt(bcx, cmpr.val, Type::i8())
             }
-            let cmpr = base::compare_scalar_types(bcx, lhs, rhs, rhs_t, op);
-            bcx = cmpr.bcx;
-            ZExt(bcx, cmpr.val, Type::i8(bcx.ccx()))
         }
       }
       _ => {

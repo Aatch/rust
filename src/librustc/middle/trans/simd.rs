@@ -16,7 +16,7 @@ use middle::trans::expr::{Dest, Ignore, SaveIn};
 use middle::trans::expr;
 use middle::trans::cleanup::CleanupMethods;
 use middle::trans::build::{InsertElement,GEPi,VectorSplat,Store,FCmp,ICmp};
-use middle::trans::build::{ExtractElement,And,ZExt,ShuffleVector,Load};
+use middle::trans::build::{ExtractElement,And,ZExt,ShuffleVector,Load,InBoundsGEP};
 use middle::ty;
 use middle::trans::type_of;
 use lib;
@@ -112,21 +112,27 @@ pub fn trans_shuffle<'a>(bcx: &'a Block<'a>,
     let (len, mask) = field_name_to_mask(ccx, name);
 
     let sub_ty = ty::simd_type(bcx.tcx(), base.ty);
-    let elt_ty = type_of::type_of(bcx.ccx(), sub_ty);
-    let num_elts = ty::simd_size(bcx.tcx(), base.ty);
+    let datum = if len == 1 {
+        base.get_element(sub_ty, |src| {
+            InBoundsGEP(bcx, src, [C_i32(ccx, 0), mask])
+        }).to_expr_datum()
+    } else {
+        let elt_ty = type_of::type_of(bcx.ccx(), sub_ty);
+        let num_elts = ty::simd_size(bcx.tcx(), base.ty);
 
-    let vec = Load(bcx, base.to_llref());
-    let vec2 = unsafe {
-        llvm::LLVMGetUndef(Type::vector(&elt_ty, num_elts as u64).to_ref())
+        let vec = Load(bcx, base.to_llref());
+        let vec2 = unsafe {
+            llvm::LLVMGetUndef(Type::vector(&elt_ty, num_elts as u64).to_ref())
+        };
+
+        debug!("trans_shuffle [{}, {}, {}]",
+            ccx.tn.val_to_str(vec), ccx.tn.val_to_str(vec2), ccx.tn.val_to_str(mask));
+
+        let shuffled = ShuffleVector(bcx, vec, vec2, mask);
+
+        Datum(shuffled, ty::mk_simd(bcx.tcx(), sub_ty, len),
+            RvalueExpr(Rvalue(ByValue)))
     };
-
-    debug!("trans_shuffle [{}, {}, {}]",
-        ccx.tn.val_to_str(vec), ccx.tn.val_to_str(vec2), ccx.tn.val_to_str(mask));
-
-    let shuffled = ShuffleVector(bcx, vec, vec2, mask);
-
-    let datum = Datum(shuffled, ty::mk_simd(bcx.tcx(), sub_ty, len),
-        RvalueExpr(Rvalue(ByValue)));
 
     DatumBlock { datum: datum, bcx: bcx }
 }
@@ -155,5 +161,9 @@ fn field_name_to_mask(ccx: &CrateContext, mut name: &str) -> (uint, ValueRef) {
         }
     }).collect();
 
-    (vec.len(), C_vector(vec.as_slice()))
+    if vec.len() == 1 {
+        (1, *vec.get(0))
+    } else {
+        (vec.len(), C_vector(vec.as_slice()))
+    }
 }

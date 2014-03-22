@@ -1486,7 +1486,11 @@ pub fn lookup_simd_field(tcx: &ty::ctxt,
                         }
                     }
                     let new_len = field_name.len() - 1;
-                    Some(ty::mk_simd(tcx, ty, new_len))
+                    match new_len {
+                        0 => None,
+                        1 => Some(ty),
+                        _ => Some(ty::mk_simd(tcx, ty, new_len))
+                    }
                 }
                 Some(c @ 'w'..'z') => {
                     match geom_char_to_pos(c) {
@@ -1518,7 +1522,11 @@ pub fn lookup_simd_field(tcx: &ty::ctxt,
                         }
                     }
                     let new_len = field_name.len();
-                    Some(ty::mk_simd(tcx, ty, new_len))
+                    match new_len {
+                        0 => None,
+                        1 => Some(ty),
+                        _ => Some(ty::mk_simd(tcx, ty, new_len))
+                    }
                 }
                 _ => None
             }

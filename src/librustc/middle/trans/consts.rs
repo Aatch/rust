@@ -670,6 +670,20 @@ fn const_expr_unadjusted(cx: &CrateContext, e: &ast::Expr,
                   _ => cx.sess().span_bug(e.span, "expected a struct or variant def")
               }
           }
+          ast::ExprSimd(ref exprs) => {
+            let (vs, inlineable) = slice::unzip(exprs.iter().map(|e| const_expr(cx, *e, is_local)));
+            (C_vector(vs), inlineable.iter().fold(true, |a, &b| a && b))
+          }
+          ast::ExprSimdRepeat(expr, count) => {
+            let n = match const_eval::eval_const_expr(cx.tcx(), count) {
+                const_eval::const_int(i)  => i as uint,
+                const_eval::const_uint(i) => i as uint,
+                _ => cx.sess().span_bug(count.span, "count must be integral const expression.")
+            };
+            let (elem, inlineable) = const_expr(cx, expr, is_local);
+            let vs = slice::from_elem(n, elem);
+            (C_vector(vs), inlineable)
+          }
           ast::ExprParen(e) => { const_expr(cx, e, is_local) }
           _ => cx.sess().span_bug(e.span,
                   "bad constant expression type in consts::const_expr")

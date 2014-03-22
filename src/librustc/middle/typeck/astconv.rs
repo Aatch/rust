@@ -630,7 +630,7 @@ pub fn ast_ty_to_ty<AC:AstConv, RS:RegionScope>(
                 }
             }
             ast::TySimd(subty, e) => {
-                match const_eval::eval_const_expr_partial(&tcx, e) {
+                match const_eval::eval_const_expr_partial(tcx, e) {
                     Ok(ref r) => {
                         let i = match *r {
                             const_eval::const_int(i) => i as uint,

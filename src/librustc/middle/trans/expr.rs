@@ -515,7 +515,7 @@ fn trans_index<'a>(bcx: &'a Block<'a>,
         let len = C_uint(bcx.ccx(), ty::simd_size(bcx.tcx(), base_datum.ty));
         let bounds_check = ICmp(bcx, lib::llvm::IntUGE, ix_val, len);
         let expect = ccx.intrinsics.get_copy(&("llvm.expect.i1"));
-        let expected = Call(bcx, expect, [bounds_check, C_i1(false)], []);
+        let expected = Call(bcx, expect, [bounds_check, C_i1(ccx, false)], []);
         let bcx = with_cond(bcx, expected, |bcx| {
             controlflow::trans_fail_bounds_check(bcx, index_expr.span, ix_val, len)
         });
@@ -534,7 +534,7 @@ fn trans_index<'a>(bcx: &'a Block<'a>,
 
         let bounds_check = ICmp(bcx, lib::llvm::IntUGE, ix_val, len);
         let expect = ccx.intrinsics.get_copy(&("llvm.expect.i1"));
-        let expected = Call(bcx, expect, [bounds_check, C_i1(false)], []);
+        let expected = Call(bcx, expect, [bounds_check, C_i1(ccx, false)], []);
         let bcx = with_cond(bcx, expected, |bcx| {
             controlflow::trans_fail_bounds_check(bcx, index_expr.span, ix_val, len)
         });
@@ -1384,7 +1384,7 @@ fn trans_eager_binop<'a>(
             } else {
                 let cmpr = base::compare_scalar_types(bcx, lhs, rhs, rhs_t, op);
                 bcx = cmpr.bcx;
-                ZExt(bcx, cmpr.val, Type::i8())
+                ZExt(bcx, cmpr.val, Type::i8(bcx.ccx()))
             }
         }
       }
@@ -1508,15 +1508,30 @@ fn trans_overloaded_op<'a, 'b>(
 }
 
 fn int_cast(bcx: &Block,
-            lldsttype: Type,
-            llsrctype: Type,
+            dst_type: ty::t,
+            src_type: ty::t,
             llsrc: ValueRef,
             signed: bool)
             -> ValueRef {
+    let ccx = bcx.ccx();
     let _icx = push_ctxt("int_cast");
+    let lldsttype = type_of::type_of(ccx, dst_type);
     unsafe {
-        let srcsz = llvm::LLVMGetIntTypeWidth(llsrctype.to_ref());
-        let dstsz = llvm::LLVMGetIntTypeWidth(lldsttype.to_ref());
+        let srcsz = if ty::type_is_simd(bcx.tcx(), src_type) {
+            let llsrctype = type_of::type_of(ccx, ty::simd_type(bcx.tcx(), src_type));
+            llvm::LLVMGetIntTypeWidth(llsrctype.to_ref())
+        } else {
+            let llsrctype = type_of::type_of(ccx, src_type);
+            llvm::LLVMGetIntTypeWidth(llsrctype.to_ref())
+        };
+
+        let dstsz = if ty::type_is_simd(bcx.tcx(), dst_type) {
+            let lldst = type_of::type_of(ccx, ty::simd_type(bcx.tcx(), dst_type));
+            llvm::LLVMGetIntTypeWidth(lldst.to_ref())
+        } else {
+            llvm::LLVMGetIntTypeWidth(lldsttype.to_ref())
+        };
+
         return if dstsz == srcsz {
             BitCast(bcx, llsrc, lldsttype)
         } else if srcsz > dstsz {
@@ -1530,13 +1545,25 @@ fn int_cast(bcx: &Block,
 }
 
 fn float_cast(bcx: &Block,
-              lldsttype: Type,
-              llsrctype: Type,
+              dst_type: ty::t,
+              src_type: ty::t,
               llsrc: ValueRef)
               -> ValueRef {
     let _icx = push_ctxt("float_cast");
-    let srcsz = llsrctype.float_width();
-    let dstsz = lldsttype.float_width();
+    let ccx = bcx.ccx();
+    let lldsttype = type_of::type_of(ccx, dst_type);
+    let srcsz = if ty::type_is_simd(bcx.tcx(), src_type) {
+        type_of::type_of(ccx, ty::simd_type(bcx.tcx(), src_type)).float_width()
+    } else {
+        type_of::type_of(ccx, src_type).float_width()
+    };
+
+    let dstsz = if ty::type_is_simd(bcx.tcx(), dst_type) {
+        type_of::type_of(ccx, ty::simd_type(bcx.tcx(), dst_type)).float_width()
+    } else {
+        lldsttype.float_width()
+    };
+
     return if dstsz > srcsz {
         FPExt(bcx, llsrc, lldsttype)
     } else if srcsz > dstsz {
@@ -1564,6 +1591,7 @@ pub fn cast_type_kind(t: ty::t) -> cast_kind {
         ty::ty_uint(..)    => cast_integral,
         ty::ty_bool       => cast_integral,
         ty::ty_enum(..)    => cast_enum,
+        ty::ty_simd(ty,_) => cast_type_kind(ty),
         _                 => cast_other
     }
 }
@@ -1581,43 +1609,47 @@ fn trans_imm_cast<'a>(bcx: &'a Block<'a>,
     let k_in = cast_type_kind(t_in);
     let k_out = cast_type_kind(t_out);
     let s_in = k_in == cast_integral && ty::type_is_signed(t_in);
-    let ll_t_in = type_of::type_of(ccx, t_in);
-    let ll_t_out = type_of::type_of(ccx, t_out);
 
+    let ll_t_in = type_of::type_of(ccx, t_in);
     // Convert the value to be cast into a ValueRef, either by-ref or
     // by-value as appropriate given its type:
     let datum = unpack_datum!(bcx, trans(bcx, expr));
     let newval = match (k_in, k_out) {
         (cast_integral, cast_integral) => {
             let llexpr = datum.to_llscalarish(bcx);
-            int_cast(bcx, ll_t_out, ll_t_in, llexpr, s_in)
+            int_cast(bcx, t_out, t_in, llexpr, s_in)
         }
         (cast_float, cast_float) => {
             let llexpr = datum.to_llscalarish(bcx);
-            float_cast(bcx, ll_t_out, ll_t_in, llexpr)
+            float_cast(bcx, t_out, t_in, llexpr)
         }
         (cast_integral, cast_float) => {
             let llexpr = datum.to_llscalarish(bcx);
+            let ll_t_out = type_of::type_of(ccx, t_out);
             if s_in {
                 SIToFP(bcx, llexpr, ll_t_out)
             } else { UIToFP(bcx, llexpr, ll_t_out) }
         }
         (cast_float, cast_integral) => {
             let llexpr = datum.to_llscalarish(bcx);
+            let ll_t_out = type_of::type_of(ccx, t_out);
             if ty::type_is_signed(t_out) {
                 FPToSI(bcx, llexpr, ll_t_out)
             } else { FPToUI(bcx, llexpr, ll_t_out) }
         }
         (cast_integral, cast_pointer) => {
             let llexpr = datum.to_llscalarish(bcx);
+            let ll_t_out = type_of::type_of(ccx, t_out);
             IntToPtr(bcx, llexpr, ll_t_out)
         }
         (cast_pointer, cast_integral) => {
             let llexpr = datum.to_llscalarish(bcx);
+            let ll_t_out = type_of::type_of(ccx, t_out);
             PtrToInt(bcx, llexpr, ll_t_out)
         }
         (cast_pointer, cast_pointer) => {
             let llexpr = datum.to_llscalarish(bcx);
+            let ll_t_out = type_of::type_of(ccx, t_out);
             PointerCast(bcx, llexpr, ll_t_out)
         }
         (cast_enum, cast_integral) |
@@ -1629,9 +1661,10 @@ fn trans_imm_cast<'a>(bcx: &'a Block<'a>,
             let llexpr_ptr = datum.to_llref();
             let lldiscrim_a =
                 adt::trans_get_discr(bcx, repr, llexpr_ptr, Some(Type::i64(ccx)));
+            let ll_t_out = type_of::type_of(ccx, t_out);
             match k_out {
-                cast_integral => int_cast(bcx, ll_t_out,
-                                          val_ty(lldiscrim_a),
+                cast_integral => int_cast(bcx, t_out,
+                                          ty::mk_i64(),
                                           lldiscrim_a, true),
                 cast_float => SIToFP(bcx, lldiscrim_a, ll_t_out),
                 _ => ccx.sess().bug(format!("translating unsupported cast: \

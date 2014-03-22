@@ -511,11 +511,11 @@ impl<'a> State<'a> {
                 try!(word(&mut self.s, "_"));
             }
             ast::TySimd(ty, v) => {
-                try!(word(&mut s.s, "simd!["));
-                try!(print_type(s, ty));
-                try!(word(&mut s.s, ", .."));
-                try!(print_expr(s, v));
-                try!(word(&mut s.s, "]"));
+                try!(word(&mut self.s, "simd!["));
+                try!(self.print_type(ty));
+                try!(word(&mut self.s, ", .."));
+                try!(self.print_expr(v));
+                try!(word(&mut self.s, "]"));
             }
         }
         self.end()
@@ -1459,23 +1459,23 @@ impl<'a> State<'a> {
                 try!(self.pclose());
             }
             ast::ExprMac(ref m) => try!(self.print_mac(m)),
-          ast::ExprSimd(ref exprs) => {
-              try!(ibox(s, indent_unit));
-              try!(word(&mut s.s, "simd!["));
-              try!(commasep_exprs(s, Inconsistent, exprs.as_slice()));
-              try!(word(&mut s.s, "]"));
-              try!(end(s));
-          }
-          ast::ExprSimdRepeat(expr, count) => {
-              try!(ibox(s, indent_unit));
-              try!(word(&mut s.s, "simd!["));
-              try!(print_expr(s, expr));
-              try!(word(&mut s.s, ","));
-              try!(word(&mut s.s, ".."));
-              try!(print_expr(s, count));
-              try!(word(&mut s.s, "]"));
-              try!(end(s));
-          }
+            ast::ExprSimd(ref exprs) => {
+                try!(self.ibox(indent_unit));
+                try!(word(&mut self.s, "simd!["));
+                try!(self.commasep_exprs(Inconsistent, exprs.as_slice()));
+                try!(word(&mut self.s, "]"));
+                try!(self.end());
+            }
+            ast::ExprSimdRepeat(expr, count) => {
+                try!(self.ibox(indent_unit));
+                try!(word(&mut self.s, "simd!["));
+                try!(self.print_expr(expr));
+                try!(word(&mut self.s, ","));
+                try!(word(&mut self.s, ".."));
+                try!(self.print_expr(count));
+                try!(word(&mut self.s, "]"));
+                try!(self.end());
+            }
             ast::ExprParen(e) => {
                 try!(self.popen());
                 try!(self.print_expr(e));

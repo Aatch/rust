@@ -58,7 +58,7 @@ pub fn trans_simd<'a>(bcx: &'a Block<'a>,
                     return expr::trans_into(bcx, elem, Ignore);
                 }
                 SaveIn(lldest) => {
-                    let count = ty::eval_repeat_count(&bcx.tcx(), count_expr);
+                    let count = ty::eval_repeat_count(bcx.tcx(), count_expr);
                     if count == 0 {
                         bcx.tcx().sess.span_bug(count_expr.span, "Unexpected zero count");
                     }
@@ -93,13 +93,13 @@ pub fn trans_simd_eqop<'a>(bcx: &'a Block<'a>,
         ICmp(bcx, lib::llvm::IntEQ, lhs, rhs)
     };
 
-    let mut res = C_i1(true);
+    let mut res = C_i1(bcx.ccx(), true);
     for i in range(0, simd_size) {
-        let element = ExtractElement(bcx, simd_eq, C_i32(i as i32));
+        let element = ExtractElement(bcx, simd_eq, C_i32(bcx.ccx(), i as i32));
         res = And(bcx, res, element);
     }
 
-    ZExt(bcx, res, Type::i8())
+    ZExt(bcx, res, Type::i8(bcx.ccx()))
 }
 
 pub fn trans_shuffle<'a>(bcx: &'a Block<'a>,
@@ -109,7 +109,7 @@ pub fn trans_shuffle<'a>(bcx: &'a Block<'a>,
 
     let field = token::get_ident(field);
     let name = field.get();
-    let (len, mask) = field_name_to_mask(name);
+    let (len, mask) = field_name_to_mask(ccx, name);
 
     let sub_ty = ty::simd_type(bcx.tcx(), base.ty);
     let elt_ty = type_of::type_of(bcx.ccx(), sub_ty);
@@ -131,7 +131,7 @@ pub fn trans_shuffle<'a>(bcx: &'a Block<'a>,
     DatumBlock { datum: datum, bcx: bcx }
 }
 
-fn field_name_to_mask(mut name: &str) -> (uint, ValueRef) {
+fn field_name_to_mask(ccx: &CrateContext, mut name: &str) -> (uint, ValueRef) {
 
     if name[0] == 0x73 { // if it begins with a 's'
         name = name.slice_from(1);
@@ -141,16 +141,16 @@ fn field_name_to_mask(mut name: &str) -> (uint, ValueRef) {
         match c {
             '0'..'9' => {
                 let val = (c as uint) - ('0' as uint);
-                C_i32(val as i32)
+                C_i32(ccx, val as i32)
             }
             'a'..'f' => {
                 let val = (c as uint) - ('a' as uint);
-                C_i32(val as i32)
+                C_i32(ccx, val as i32)
             }
-            'x' => C_i32(0),
-            'y' => C_i32(1),
-            'z' => C_i32(2),
-            'w' => C_i32(3),
+            'x' => C_i32(ccx, 0),
+            'y' => C_i32(ccx, 1),
+            'z' => C_i32(ccx, 2),
+            'w' => C_i32(ccx, 3),
             _ => fail!("Invalid position in shuffle access")
         }
     }).collect();

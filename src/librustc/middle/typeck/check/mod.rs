@@ -1439,7 +1439,7 @@ pub fn lookup_field_ty(tcx: &ty::ctxt,
     o_field.map(|f| ty::lookup_field_type(tcx, class_id, f.id, substs))
 }
 
-pub fn lookup_simd_field(tcx: ty::ctxt,
+pub fn lookup_simd_field(tcx: &ty::ctxt,
                          span: Span,
                          simd_ty: ty::t,
                          field: ast::Name) -> Option<ty::t> {
@@ -3129,6 +3129,16 @@ fn check_expr_with_unifier(fcx: &FnCtxt,
                             _ => {
                                 demand::coerce(fcx, e.span, t_1, e);
                             }
+                        }
+                    } else if ty::type_is_simd(tcx, te) && ty::type_is_simd(tcx, t1) {
+                        let te_sz = ty::simd_size(tcx, te);
+                        let t1_sz = ty::simd_size(tcx, t1);
+                        if te_sz != t1_sz {
+                            fcx.type_error_message(expr.span, |_| {
+                                format!("cannot cast SIMD vector of size `{}` \
+                                            to vector of size {}",
+                                            te_sz, t1_sz)
+                            }, t_e, None);
                         }
                     } else if !(type_is_scalar(fcx,expr.span,t_e)
                                 && t_1_is_trivial) {

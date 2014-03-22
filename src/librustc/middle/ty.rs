@@ -1450,11 +1450,11 @@ pub fn mk_struct(cx: &ctxt, struct_id: ast::DefId, substs: substs) -> t {
     mk_t(cx, ty_struct(struct_id, substs))
 }
 
-pub fn mk_simd(cx: ctxt, t: t, n: uint) -> t {
+pub fn mk_simd(cx: &ctxt, t: t, n: uint) -> t {
     mk_t(cx, ty_simd(t, n))
 }
 
-pub fn mk_var(cx: ctxt, v: TyVid) -> t { mk_infer(cx, TyVar(v)) }
+pub fn mk_var(cx: &ctxt, v: TyVid) -> t { mk_infer(cx, TyVar(v)) }
 
 pub fn mk_int_var(cx: &ctxt, v: IntVid) -> t { mk_infer(cx, IntVar(v)) }
 
@@ -4346,7 +4346,7 @@ pub fn is_binopable(cx: &ctxt, ty: t, op: ast::BinOp) -> bool {
         }
     }
 
-    fn tycat(cx: ctxt, ty: t) -> int {
+    fn tycat(cx: &ctxt, ty: t) -> int {
         match get(ty).sty {
           ty_char => tycat_char,
           ty_bool => tycat_bool,

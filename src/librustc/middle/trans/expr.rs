@@ -1610,7 +1610,6 @@ fn trans_imm_cast<'a>(bcx: &'a Block<'a>,
     let k_out = cast_type_kind(t_out);
     let s_in = k_in == cast_integral && ty::type_is_signed(t_in);
 
-    let ll_t_in = type_of::type_of(ccx, t_in);
     // Convert the value to be cast into a ValueRef, either by-ref or
     // by-value as appropriate given its type:
     let datum = unpack_datum!(bcx, trans(bcx, expr));

@@ -14,8 +14,7 @@ use middle::trans::common::*;
 use middle::trans::datum::*;
 use middle::trans::expr::{Dest, Ignore, SaveIn};
 use middle::trans::expr;
-use middle::trans::cleanup::CleanupMethods;
-use middle::trans::build::{InsertElement,GEPi,VectorSplat,Store,FCmp,ICmp};
+use middle::trans::build::{GEPi,VectorSplat,Store,FCmp,ICmp};
 use middle::trans::build::{ExtractElement,And,ZExt,ShuffleVector,Load,InBoundsGEP};
 use middle::ty;
 use middle::trans::type_of;
@@ -23,13 +22,10 @@ use lib;
 use lib::llvm::{ValueRef,llvm};
 use middle::trans::type_::Type;
 
-use std::vec_ng::Vec;
-
 pub fn trans_simd<'a>(bcx: &'a Block<'a>,
                       expr: &ast::Expr,
                       dest: expr::Dest) -> &'a Block<'a> {
 
-    let fcx = bcx.fcx;
     let mut bcx = bcx;
 
     debug!("trans_simd(expr={}, dest={})",
@@ -43,7 +39,7 @@ pub fn trans_simd<'a>(bcx: &'a Block<'a>,
                         bcx = expr::trans_into(bcx, *el, Ignore);
                     }
                 }
-                SaveIn(mut lldest) => {
+                SaveIn(lldest) => {
                     for (i, elem) in elems.iter().enumerate() {
                         let lleltptr = GEPi(bcx, lldest, [0, i]);
                         bcx = expr::trans_into(bcx, *elem, SaveIn(lleltptr));

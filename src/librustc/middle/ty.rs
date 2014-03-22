@@ -1639,7 +1639,7 @@ pub fn type_is_sequence(ty: t) -> bool {
     }
 }
 
-pub fn type_is_simd(cx: &ctxt, ty: t) -> bool {
+pub fn type_is_simd(_cx: &ctxt, ty: t) -> bool {
     match get(ty).sty {
         ty_simd(..) => true,
         _ => false
@@ -1661,14 +1661,14 @@ pub fn sequence_element_type(cx: &ctxt, ty: t) -> t {
     }
 }
 
-pub fn simd_type(cx: &ctxt, ty: t) -> t {
+pub fn simd_type(_cx: &ctxt, ty: t) -> t {
     match get(ty).sty {
         ty_simd(t, _) => t,
         _ => fail!("simd_type called on invalid type")
     }
 }
 
-pub fn simd_size(cx: &ctxt, ty: t) -> uint {
+pub fn simd_size(_cx: &ctxt, ty: t) -> uint {
     match get(ty).sty {
         ty_simd(_, sz) => sz,
         _ => fail!("simd_size called on invalid type")

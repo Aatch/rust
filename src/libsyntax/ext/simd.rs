@@ -15,8 +15,6 @@ use ext::base::*;
 use parse;
 use parse::token;
 
-use std::vec_ng::Vec;
-
 pub fn expand_simd(cx: &mut ExtCtxt, sp: Span, tts: &[ast::TokenTree])
     -> base::MacResult {
 

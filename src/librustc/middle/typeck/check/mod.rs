@@ -1480,7 +1480,7 @@ pub fn lookup_simd_field(tcx: &ty::ctxt,
                             },
                             None => {
                                 tcx.sess.span_err(span,
-                                    format!("Invalid character `{}` for SIMD shuffle access", c));
+                                    format!("invalid character `{}` for SIMD shuffle access", c));
                                 return None;
                             }
                         }
@@ -1502,7 +1502,7 @@ pub fn lookup_simd_field(tcx: &ty::ctxt,
                         },
                         None => {
                             tcx.sess.span_err(span,
-                                format!("Invalid character `{}` for SIMD shuffle access", c));
+                                format!("invalid character `{}` for SIMD shuffle access", c));
                             return None;
                         }
                     }

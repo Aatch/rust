@@ -60,7 +60,7 @@ pub fn trans_simd<'a>(bcx: &'a Block<'a>,
                 SaveIn(lldest) => {
                     let count = ty::eval_repeat_count(bcx.tcx(), count_expr);
                     if count == 0 {
-                        bcx.tcx().sess.span_bug(count_expr.span, "Unexpected zero count");
+                        bcx.tcx().sess.span_bug(count_expr.span, "unexpected zero count");
                     }
 
                     let elem = unpack_datum!(bcx, expr::trans(bcx, elem));
@@ -72,7 +72,7 @@ pub fn trans_simd<'a>(bcx: &'a Block<'a>,
                 }
             }
         }
-        _ => bcx.tcx().sess.span_bug(expr.span, "Unexpected non-SIMD expression in trans_simd")
+        _ => bcx.tcx().sess.span_bug(expr.span, "unexpected non-SIMD expression in trans_simd")
     }
 }
 
@@ -164,11 +164,11 @@ pub fn trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
                 let src_field = token::get_ident(src_field);
                 let mut src_name = src_field.get();
 
-                if base_name[0] == 0x73 {
+                if base_name[0] == 's' as u8 {
                     base_name = base_name.slice_from(1);
                 }
 
-                if src_name[0] == 0x73 {
+                if src_name[0] == 's' as u8 {
                     src_name = src_name.slice_from(1);
                 }
 
@@ -176,7 +176,7 @@ pub fn trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
                     result_size,
                     ty::simd_size(bcx.tcx(), src_base_ty));
 
-                let mut mask : Vec<uint> = range(0, result_size).collect();
+                let mut mask: Vec<uint> = range(0, result_size).collect();
                 for (lhs, rhs) in base_name.chars().zip(src_name.chars()) {
                     let lhs_component = char_to_component(lhs);
                     let rhs_component = char_to_component(rhs);
@@ -219,7 +219,7 @@ pub fn trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
     let base_field = token::get_ident(field);
     let mut base_name = base_field.get();
 
-    if base_name[0] == 0x73 {
+    if base_name[0] == 's' as u8 {
         base_name = base_name.slice_from(1);
     }
 
@@ -255,7 +255,7 @@ pub fn trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
 
 fn field_name_to_mask(ccx: &CrateContext, mut name: &str) -> (uint, ValueRef) {
 
-    if name[0] == 0x73 { // if it begins with a 's'
+    if name[0] == 's' as u8 { // if it begins with a 's'
         name = name.slice_from(1);
     }
 
@@ -282,7 +282,7 @@ fn char_to_component(c: char) -> uint {
         'y' => 1,
         'z' => 2,
         'w' => 3,
-        _ => fail!("Invalid position in shuffle access")
+        _ => fail!("invalid position in shuffle access")
     }
 }
 

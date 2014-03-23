@@ -256,7 +256,7 @@ impl<'a> Visitor<()> for Context<'a> {
             ast::TyBox(_) => { self.gate_box(t.span); }
             ast::TySimd(..) => {
                 self.gate_feature("simd", t.span,
-                    "SIMD types are experimental and possibly buggy");
+                    "SIMD types are experimental and subject to change");
             }
             _ => {}
         }

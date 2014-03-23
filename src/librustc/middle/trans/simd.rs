@@ -10,12 +10,14 @@
 
 use syntax::ast;
 use syntax::parse::token;
-use middle::trans::common::*;
-use middle::trans::datum::*;
-use middle::trans::expr::{Dest, Ignore, SaveIn};
-use middle::trans::expr;
+use middle::trans::base;
 use middle::trans::build::{GEPi,VectorSplat,Store,FCmp,ICmp};
 use middle::trans::build::{ExtractElement,And,ZExt,ShuffleVector,Load,InBoundsGEP};
+use middle::trans::common::*;
+use middle::trans::cleanup::CleanupMethods;
+use middle::trans::datum::*;
+use middle::trans::expr::{Dest, Ignore, SaveIn, trans_to_lvalue, trans};
+use middle::trans::expr;
 use middle::ty;
 use middle::trans::type_of;
 use lib;
@@ -133,6 +135,116 @@ pub fn trans_shuffle<'a>(bcx: &'a Block<'a>,
     DatumBlock { datum: datum, bcx: bcx }
 }
 
+pub fn trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
+                                dst: &ast::Expr,
+                                base: &ast::Expr,
+                                field: ast::Ident,
+                                src: &ast::Expr) -> &'a Block<'a> {
+    let mut bcx = bcx;
+    let ccx = bcx.ccx();
+    let _icx = base::push_ctxt("trans_shuffle_assign");
+
+    let base_ty = expr_ty(bcx, base);
+    let vec_size = ty::simd_size(bcx.tcx(), base_ty);
+
+    // Check to see if the src expression is a shuffle as well
+    match src.node {
+        ast::ExprField(src_base, src_field, _) => {
+            let src_base_ty = expr_ty(bcx, src_base);
+            // Ok, so both the dst and the src are simd shuffles, we can
+            // do this using a single shufflevector instruction
+            if ty::type_is_simd(bcx.tcx(), src_base_ty) {
+                assert_eq!(vec_size,
+                           ty::simd_size(bcx.tcx(), src_base_ty));
+                // Calculate the mask for the shuffle by starting with the identity
+                // mask and then replacing components based on the pair on the LHS and the
+                // RHS
+                let base_field = token::get_ident(field);
+                let mut base_name = base_field.get();
+                let src_field = token::get_ident(src_field);
+                let mut src_name = src_field.get();
+
+                if base_name[0] == 0x73 {
+                    base_name = base_name.slice_from(1);
+                }
+
+                if src_name[0] == 0x73 {
+                    src_name = src_name.slice_from(1);
+                }
+
+                let mut mask : Vec<uint> = range(0, vec_size).collect();
+                for (lhs, rhs) in base_name.chars().zip(src_name.chars()) {
+                    let lhs_component = char_to_component(lhs);
+                    let rhs_component = char_to_component(rhs);
+
+                    *mask.get_mut(lhs_component) = rhs_component + vec_size;
+                }
+
+                let mask = C_vector(mask.map(|&c| C_i32(bcx.ccx(), c as i32)).as_slice());
+
+                bcx.fcx.push_ast_cleanup_scope(src.id);
+                let src_datum = unpack_datum!(bcx, trans(bcx, src_base));
+                bcx = bcx.fcx.pop_and_trans_ast_cleanup_scope(bcx, src.id);
+
+                bcx.fcx.push_ast_cleanup_scope(dst.id);
+                let base_datum = unpack_datum!(bcx, trans_to_lvalue(bcx, base, "shuffle_base"));
+                bcx = bcx.fcx.pop_and_trans_ast_cleanup_scope(bcx, dst.id);
+
+                let base_vec = base_datum.to_llscalarish(bcx);
+                let src_vec = src_datum.to_llscalarish(bcx);
+
+                debug!("trans_shuffle_assign: base_vec={}, src_vec={}, mask={}",
+                    ccx.tn.val_to_str(base_vec), ccx.tn.val_to_str(src_vec),
+                    ccx.tn.val_to_str(mask));
+
+                let result = ShuffleVector(bcx, base_vec, src_vec, mask);
+
+                let base_dest = base_datum.to_llref();
+                Store(bcx, result, base_dest);
+
+                return bcx;
+            }
+        }
+        _ => {}
+    }
+
+    bcx.fcx.push_ast_cleanup_scope(dst.id);
+    let base_datum = unpack_datum!(bcx, trans_to_lvalue(bcx, base, "shuffle_base"));
+    bcx = bcx.fcx.pop_and_trans_ast_cleanup_scope(bcx, dst.id);
+
+    let base_field = token::get_ident(field);
+    let mut base_name = base_field.get();
+
+    if base_name[0] == 0x73 {
+        base_name = base_name.slice_from(1);
+    }
+
+    let mut mask : Vec<uint> = range(0, vec_size).collect();
+    for c in base_name.chars() {
+        let component = char_to_component(c);
+
+        *mask.get_mut(component) = component + vec_size;
+    }
+
+    let mask = C_vector(mask.map(|&c| C_i32(bcx.ccx(), c as i32)).as_slice());
+
+    let src_datum = unpack_datum!(bcx, trans(bcx, src));
+
+    let base_vec = base_datum.to_llscalarish(bcx);
+    let src_vec = src_datum.to_llscalarish(bcx);
+
+    debug!("trans_shuffle_assign: base_vec={}, src_vec={}, mask={}",
+        ccx.tn.val_to_str(base_vec), ccx.tn.val_to_str(src_vec),
+        ccx.tn.val_to_str(mask));
+
+    let result = ShuffleVector(bcx, base_vec, src_vec, mask);
+
+    let base_dest = base_datum.to_llref();
+    Store(bcx, result, base_dest);
+
+    return bcx;
+}
+
 fn field_name_to_mask(ccx: &CrateContext, mut name: &str) -> (uint, ValueRef) {
 
     if name[0] == 0x73 { // if it begins with a 's'
@@ -140,26 +252,28 @@ fn field_name_to_mask(ccx: &CrateContext, mut name: &str) -> (uint, ValueRef) {
     }
 
     let vec : Vec<ValueRef> = name.chars().map(|c| {
-        match c {
-            '0'..'9' => {
-                let val = (c as uint) - ('0' as uint);
-                C_i32(ccx, val as i32)
-            }
-            'a'..'f' => {
-                let val = (c as uint) - ('a' as uint);
-                C_i32(ccx, val as i32)
-            }
-            'x' => C_i32(ccx, 0),
-            'y' => C_i32(ccx, 1),
-            'z' => C_i32(ccx, 2),
-            'w' => C_i32(ccx, 3),
-            _ => fail!("Invalid position in shuffle access")
-        }
+        C_i32(ccx, char_to_component(c) as i32)
     }).collect();
 
     if vec.len() == 1 {
         (1, *vec.get(0))
     } else {
         (vec.len(), C_vector(vec.as_slice()))
+    }
+}
+
+fn char_to_component(c: char) -> uint {
+    match c {
+        '0'..'9' => {
+            (c as uint) - ('0' as uint)
+        }
+        'a'..'f' => {
+            (c as uint) - ('a' as uint)
+        }
+        'x' => 0,
+        'y' => 1,
+        'z' => 2,
+        'w' => 3,
+        _ => fail!("Invalid position in shuffle access")
     }
 }

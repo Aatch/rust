@@ -644,32 +644,37 @@ fn trans_rvalue_stmt_unadjusted<'a>(bcx: &'a Block<'a>,
             controlflow::trans_loop(bcx, expr.id, body)
         }
         ast::ExprAssign(dst, src) => {
-            let src_datum = unpack_datum!(bcx, trans(bcx, src));
-            let dst_datum = unpack_datum!(bcx, trans_to_lvalue(bcx, dst, "assign"));
+            match maybe_trans_shuffle_assign(bcx, dst, src) {
+                Some(bcx) => bcx,
+                None => {
+                    let src_datum = unpack_datum!(bcx, trans(bcx, src));
+                    let dst_datum = unpack_datum!(bcx, trans_to_lvalue(bcx, dst, "assign"));
 
-            if ty::type_needs_drop(bcx.tcx(), dst_datum.ty) {
-                // If there are destructors involved, make sure we
-                // are copying from an rvalue, since that cannot possible
-                // alias an lvalue. We are concerned about code like:
-                //
-                //   a = a
-                //
-                // but also
-                //
-                //   a = a.b
-                //
-                // where e.g. a : Option<Foo> and a.b :
-                // Option<Foo>. In that case, freeing `a` before the
-                // assignment may also free `a.b`!
-                //
-                // We could avoid this intermediary with some analysis
-                // to determine whether `dst` may possibly own `src`.
-                let src_datum = unpack_datum!(
-                    bcx, src_datum.to_rvalue_datum(bcx, "ExprAssign"));
-                bcx = glue::drop_ty(bcx, dst_datum.val, dst_datum.ty);
-                src_datum.store_to(bcx, dst_datum.val)
-            } else {
-                src_datum.store_to(bcx, dst_datum.val)
+                    if ty::type_needs_drop(bcx.tcx(), dst_datum.ty) {
+                        // If there are destructors involved, make sure we
+                        // are copying from an rvalue, since that cannot possible
+                        // alias an lvalue. We are concerned about code like:
+                        //
+                        //   a = a
+                        //
+                        // but also
+                        //
+                        //   a = a.b
+                        //
+                        // where e.g. a : Option<Foo> and a.b :
+                        // Option<Foo>. In that case, freeing `a` before the
+                        // assignment may also free `a.b`!
+                        //
+                        // We could avoid this intermediary with some analysis
+                        // to determine whether `dst` may possibly own `src`.
+                        let src_datum = unpack_datum!(
+                            bcx, src_datum.to_rvalue_datum(bcx, "ExprAssign"));
+                        bcx = glue::drop_ty(bcx, dst_datum.val, dst_datum.ty);
+                        src_datum.store_to(bcx, dst_datum.val)
+                    } else {
+                        src_datum.store_to(bcx, dst_datum.val)
+                    }
+                }
             }
         }
         ast::ExprAssignOp(op, dst, src) => {
@@ -1885,4 +1890,25 @@ fn deref_once<'a>(bcx: &'a Block<'a>,
         let datum = Datum { ty: content_ty, val: llptr, kind: kind };
         DatumBlock { bcx: bcx, datum: datum }
     }
+}
+
+fn maybe_trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
+                                  dst: &ast::Expr,
+                                  src: &ast::Expr) -> Option<&'a Block<'a>> {
+
+    let mut bcx = bcx;
+
+    match dst.node {
+        ast::ExprField(base, ident, _) => {
+            let base_ty = expr_ty(bcx, base);
+            if ty::type_is_simd(bcx.tcx(), base_ty) {
+                bcx = simd::trans_shuffle_assign(bcx, dst, base, ident, src);
+                Some(bcx)
+            } else {
+                None
+            }
+        }
+        _ => None
+    }
+
 }

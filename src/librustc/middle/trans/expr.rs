@@ -1900,7 +1900,7 @@ fn maybe_trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
 
     match dst.node {
         ast::ExprField(base, ident, _) => {
-            let base_ty = expr_ty(bcx, base);
+            let base_ty = expr_ty_adjusted(bcx, base);
             if ty::type_is_simd(bcx.tcx(), base_ty) {
                 bcx = simd::trans_shuffle_assign(bcx, dst, base, ident, src);
                 Some(bcx)

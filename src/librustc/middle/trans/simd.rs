@@ -8,6 +8,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use std;
+
 use syntax::ast;
 use syntax::parse::token;
 use middle::trans::base;
@@ -21,7 +23,7 @@ use middle::trans::expr;
 use middle::ty;
 use middle::trans::type_of;
 use lib;
-use lib::llvm::{ValueRef,llvm};
+use lib::llvm::{ValueRef,TypeRef,llvm};
 use middle::trans::type_::Type;
 
 pub fn trans_simd<'a>(bcx: &'a Block<'a>,
@@ -144,18 +146,16 @@ pub fn trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
     let ccx = bcx.ccx();
     let _icx = base::push_ctxt("trans_shuffle_assign");
 
-    let base_ty = expr_ty(bcx, base);
-    let vec_size = ty::simd_size(bcx.tcx(), base_ty);
+    let base_ty = expr_ty_adjusted(bcx, base);
+    let result_size = ty::simd_size(bcx.tcx(), base_ty);
 
     // Check to see if the src expression is a shuffle as well
     match src.node {
         ast::ExprField(src_base, src_field, _) => {
-            let src_base_ty = expr_ty(bcx, src_base);
+            let src_base_ty = expr_ty_adjusted(bcx, src_base);
             // Ok, so both the dst and the src are simd shuffles, we can
             // do this using a single shufflevector instruction
             if ty::type_is_simd(bcx.tcx(), src_base_ty) {
-                assert_eq!(vec_size,
-                           ty::simd_size(bcx.tcx(), src_base_ty));
                 // Calculate the mask for the shuffle by starting with the identity
                 // mask and then replacing components based on the pair on the LHS and the
                 // RHS
@@ -172,7 +172,11 @@ pub fn trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
                     src_name = src_name.slice_from(1);
                 }
 
-                let mut mask : Vec<uint> = range(0, vec_size).collect();
+                let vec_size = std::cmp::max(
+                    result_size,
+                    ty::simd_size(bcx.tcx(), src_base_ty));
+
+                let mut mask : Vec<uint> = range(0, result_size).collect();
                 for (lhs, rhs) in base_name.chars().zip(src_name.chars()) {
                     let lhs_component = char_to_component(lhs);
                     let rhs_component = char_to_component(rhs);
@@ -197,7 +201,7 @@ pub fn trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
                     ccx.tn.val_to_str(base_vec), ccx.tn.val_to_str(src_vec),
                     ccx.tn.val_to_str(mask));
 
-                let result = ShuffleVector(bcx, base_vec, src_vec, mask);
+                let result = shuffle_vector(bcx, base_vec, src_vec, mask);
 
                 let base_dest = base_datum.to_llref();
                 Store(bcx, result, base_dest);
@@ -219,16 +223,20 @@ pub fn trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
         base_name = base_name.slice_from(1);
     }
 
-    let mut mask : Vec<uint> = range(0, vec_size).collect();
-    for c in base_name.chars() {
+    let src_datum = unpack_datum!(bcx, trans(bcx, src));
+
+    let vec_size = std::cmp::max(
+        result_size,
+        ty::simd_size(bcx.tcx(), src_datum.ty));
+
+    let mut mask : Vec<uint> = range(0, result_size).collect();
+    for (i, c) in base_name.chars().enumerate() {
         let component = char_to_component(c);
 
-        *mask.get_mut(component) = component + vec_size;
+        *mask.get_mut(component) = i + vec_size;
     }
 
     let mask = C_vector(mask.map(|&c| C_i32(bcx.ccx(), c as i32)).as_slice());
-
-    let src_datum = unpack_datum!(bcx, trans(bcx, src));
 
     let base_vec = base_datum.to_llscalarish(bcx);
     let src_vec = src_datum.to_llscalarish(bcx);
@@ -237,7 +245,7 @@ pub fn trans_shuffle_assign<'a>(bcx: &'a Block<'a>,
         ccx.tn.val_to_str(base_vec), ccx.tn.val_to_str(src_vec),
         ccx.tn.val_to_str(mask));
 
-    let result = ShuffleVector(bcx, base_vec, src_vec, mask);
+    let result = shuffle_vector(bcx, base_vec, src_vec, mask);
 
     let base_dest = base_datum.to_llref();
     Store(bcx, result, base_dest);
@@ -275,5 +283,40 @@ fn char_to_component(c: char) -> uint {
         'z' => 2,
         'w' => 3,
         _ => fail!("Invalid position in shuffle access")
+    }
+}
+
+fn shuffle_vector(bcx: &Block,
+                  mut v1: ValueRef,
+                  mut v2: ValueRef,
+                  mask: ValueRef) -> ValueRef {
+
+    unsafe {
+        let v1_type = llvm::LLVMTypeOf(v1);
+        let v1_size = llvm::LLVMGetVectorSize(v1_type) as uint;
+
+        let v2_type = llvm::LLVMTypeOf(v2);
+        let v2_size = llvm::LLVMGetVectorSize(v2_type) as uint;
+
+        if v1_size > v2_size {
+            v2 = extend_vector(bcx, v2, v2_type, v1_size);
+        } else if v2_size > v1_size {
+            v1 = extend_vector(bcx, v1, v1_type, v2_size);
+        }
+
+        ShuffleVector(bcx, v1, v2, mask)
+    }
+}
+
+fn extend_vector(bcx: &Block,
+                 vec: ValueRef, vec_type: TypeRef,
+                 size: uint) -> ValueRef {
+    unsafe {
+        let other_vec = llvm::LLVMConstNull(vec_type);
+        let mask : Vec<ValueRef> = range(0, size).map(|i| C_i32(bcx.ccx(), i as i32)).collect();
+
+        let mask = C_vector(mask.as_slice());
+
+        ShuffleVector(bcx, vec, other_vec, mask)
     }
 }

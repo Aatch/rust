@@ -1204,11 +1204,13 @@ fn check_pat_uppercase_variable(cx: &Context, p: &ast::Pat) {
                     // last identifier alone is right choice for this lint.
                     let ident = path.segments.last().unwrap().identifier;
                     let s = token::get_ident(ident);
-                    if s.get().char_at(0).is_uppercase() {
-                        cx.span_lint(
-                            UppercaseVariables,
-                            path.span,
-                            "variable names should start with a lowercase character");
+                    if s.get().len() > 0 {
+                        if s.get().char_at(0).is_uppercase() {
+                            cx.span_lint(
+                                UppercaseVariables,
+                                path.span,
+                                "variable names should start with a lowercase character");
+                        }
                     }
                 }
                 _ => {}

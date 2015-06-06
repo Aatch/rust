@@ -622,6 +622,10 @@ fn convert_method<'a, 'tcx>(ccx: &CrateCtxt<'a, 'tcx>,
         astconv::ty_of_method(&ccx.icx(&(rcvr_ty_predicates, &sig.generics)),
                               sig, untransformed_rcvr_ty);
 
+    if !(fty.abi == abi::Rust || fty.abi == abi::RustCall) {
+
+    }
+
     let def_id = local_def(id);
     let ty_method = ty::Method::new(ident.name,
                                     ty_generics,
@@ -757,6 +761,11 @@ fn convert_methods<'a,'tcx,'i,I>(ccx: &CrateCtxt<'a, 'tcx>,
                 _               => "method",
             };
             span_err!(tcx.sess, span, E0201, "duplicate {}", fn_desc);
+        }
+
+        if !(sig.abi == abi::Rust || sig.abi == abi::RustCall) {
+            span_err!(tcx.sess, span, E0394,
+                      "invalid ABI {}, methods must have a Rust ABI", sig.abi);
         }
 
         convert_method(ccx,

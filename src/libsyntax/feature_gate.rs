@@ -263,6 +263,7 @@ pub const KNOWN_ATTRIBUTES: &'static [(&'static str, AttributeType)] = &[
     ("unsafe_no_drop_flag", Gated("unsafe_no_drop_flag",
                                   "unsafe_no_drop_flag has unstable semantics \
                                    and may be removed in the future")),
+    ("likely", Whitelisted),
 
     // used in resolve
     ("prelude_import", Whitelisted),

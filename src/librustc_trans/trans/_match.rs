@@ -185,11 +185,11 @@
 pub use self::BranchKind::*;
 pub use self::OptResult::*;
 pub use self::TransBindingMode::*;
-use self::Opt::*;
+use self::OptKind::*;
 use self::FailureHandler::*;
 
 use back::abi;
-use llvm::{ValueRef, BasicBlockRef};
+use llvm::{self, ValueRef, BasicBlockRef};
 use middle::check_match::StaticInliner;
 use middle::check_match;
 use middle::const_eval;
@@ -223,7 +223,7 @@ use std;
 use std::cmp::Ordering;
 use std::fmt;
 use std::rc::Rc;
-use syntax::ast;
+use syntax::{ast, attr};
 use syntax::ast::{DUMMY_NODE_ID, NodeId};
 use syntax::codemap::Span;
 use syntax::fold::Folder;
@@ -244,30 +244,44 @@ impl<'a> ConstantExpr<'a> {
 
 // An option identifying a branch (either a literal, an enum variant or a range)
 #[derive(Debug)]
-enum Opt<'a, 'tcx> {
-    ConstantValue(ConstantExpr<'a>, DebugLoc),
-    ConstantRange(ConstantExpr<'a>, ConstantExpr<'a>, DebugLoc),
-    Variant(ty::Disr, Rc<adt::Repr<'tcx>>, ast::DefId, DebugLoc),
-    SliceLengthEqual(usize, DebugLoc),
+enum OptKind<'a, 'tcx> {
+    ConstantValue(ConstantExpr<'a>),
+    ConstantRange(ConstantExpr<'a>, ConstantExpr<'a>),
+    Variant(ty::Disr, Rc<adt::Repr<'tcx>>, ast::DefId),
+    SliceLengthEqual(usize),
     SliceLengthGreaterOrEqual(/* prefix length */ usize,
-                              /* suffix length */ usize,
-                              DebugLoc),
+                              /* suffix length */ usize),
+}
+
+#[derive(Debug)]
+struct Opt<'a, 'tcx> {
+    kind: OptKind<'a, 'tcx>,
+    debug_loc: DebugLoc,
+    is_likely: bool
 }
 
 impl<'a, 'tcx> Opt<'a, 'tcx> {
+    fn new(kind: OptKind<'a, 'tcx>, debug_loc: DebugLoc) -> Opt<'a, 'tcx> {
+        Opt {
+            kind: kind,
+            debug_loc: debug_loc,
+            is_likely: false
+        }
+    }
+
     fn eq(&self, other: &Opt<'a, 'tcx>, tcx: &ty::ctxt<'tcx>) -> bool {
-        match (self, other) {
-            (&ConstantValue(a, _), &ConstantValue(b, _)) => a.eq(b, tcx),
-            (&ConstantRange(a1, a2, _), &ConstantRange(b1, b2, _)) => {
+        match (&self.kind, &other.kind) {
+            (&ConstantValue(a), &ConstantValue(b)) => a.eq(b, tcx),
+            (&ConstantRange(a1, a2), &ConstantRange(b1, b2)) => {
                 a1.eq(b1, tcx) && a2.eq(b2, tcx)
             }
-            (&Variant(a_disr, ref a_repr, a_def, _),
-             &Variant(b_disr, ref b_repr, b_def, _)) => {
+            (&Variant(a_disr, ref a_repr, a_def),
+             &Variant(b_disr, ref b_repr, b_def)) => {
                 a_disr == b_disr && *a_repr == *b_repr && a_def == b_def
             }
-            (&SliceLengthEqual(a, _), &SliceLengthEqual(b, _)) => a == b,
-            (&SliceLengthGreaterOrEqual(a1, a2, _),
-             &SliceLengthGreaterOrEqual(b1, b2, _)) => {
+            (&SliceLengthEqual(a), &SliceLengthEqual(b)) => a == b,
+            (&SliceLengthGreaterOrEqual(a1, a2),
+             &SliceLengthGreaterOrEqual(b1, b2)) => {
                 a1 == b1 && a2 == b2
             }
             _ => false
@@ -277,39 +291,33 @@ impl<'a, 'tcx> Opt<'a, 'tcx> {
     fn trans<'blk>(&self, mut bcx: Block<'blk, 'tcx>) -> OptResult<'blk, 'tcx> {
         let _icx = push_ctxt("match::trans_opt");
         let ccx = bcx.ccx();
-        match *self {
-            ConstantValue(ConstantExpr(lit_expr), _) => {
+        match self.kind {
+            ConstantValue(ConstantExpr(lit_expr)) => {
                 let lit_ty = ty::node_id_to_type(bcx.tcx(), lit_expr.id);
                 let (llval, _) = consts::const_expr(ccx, &*lit_expr, bcx.fcx.param_substs, None);
                 let lit_datum = immediate_rvalue(llval, lit_ty);
                 let lit_datum = unpack_datum!(bcx, lit_datum.to_appropriate_datum(bcx));
                 SingleResult(Result::new(bcx, lit_datum.val))
             }
-            ConstantRange(ConstantExpr(ref l1), ConstantExpr(ref l2), _) => {
+            ConstantRange(ConstantExpr(ref l1), ConstantExpr(ref l2)) => {
                 let (l1, _) = consts::const_expr(ccx, &**l1, bcx.fcx.param_substs, None);
                 let (l2, _) = consts::const_expr(ccx, &**l2, bcx.fcx.param_substs, None);
                 RangeResult(Result::new(bcx, l1), Result::new(bcx, l2))
             }
-            Variant(disr_val, ref repr, _, _) => {
+            Variant(disr_val, ref repr, _) => {
                 adt::trans_case(bcx, &**repr, disr_val)
             }
-            SliceLengthEqual(length, _) => {
+            SliceLengthEqual(length) => {
                 SingleResult(Result::new(bcx, C_uint(ccx, length)))
             }
-            SliceLengthGreaterOrEqual(prefix, suffix, _) => {
+            SliceLengthGreaterOrEqual(prefix, suffix) => {
                 LowerBound(Result::new(bcx, C_uint(ccx, prefix + suffix)))
             }
         }
     }
 
     fn debug_loc(&self) -> DebugLoc {
-        match *self {
-            ConstantValue(_,debug_loc)                 |
-            ConstantRange(_, _, debug_loc)             |
-            Variant(_, _, _, debug_loc)                |
-            SliceLengthEqual(_, debug_loc)             |
-            SliceLengthGreaterOrEqual(_, _, debug_loc) => debug_loc
-        }
+        self.debug_loc
     }
 }
 
@@ -380,6 +388,12 @@ impl<'a, 'p, 'blk, 'tcx> fmt::Debug for Match<'a, 'p, 'blk, 'tcx> {
         } else {
             write!(f, "{} pats", self.pats.len())
         }
+    }
+}
+
+impl<'a, 'p, 'blk, 'tcx> Match<'a, 'p, 'blk, 'tcx> {
+    fn is_likely(&self) -> bool {
+        attr::contains_name(&self.data.arm.attrs, "likely")
     }
 }
 
@@ -546,19 +560,19 @@ fn enter_opt<'a, 'p, 'blk, 'tcx>(
            bcx.val_to_string(val));
     let _indenter = indenter();
 
-    let ctor = match opt {
-        &ConstantValue(ConstantExpr(expr), _) => check_match::ConstantValue(
+    let ctor = match &opt.kind {
+        &ConstantValue(ConstantExpr(expr)) => check_match::ConstantValue(
             const_eval::eval_const_expr(bcx.tcx(), &*expr)
         ),
-        &ConstantRange(ConstantExpr(lo), ConstantExpr(hi), _) => check_match::ConstantRange(
+        &ConstantRange(ConstantExpr(lo), ConstantExpr(hi)) => check_match::ConstantRange(
             const_eval::eval_const_expr(bcx.tcx(), &*lo),
             const_eval::eval_const_expr(bcx.tcx(), &*hi)
         ),
-        &SliceLengthEqual(n, _) =>
+        &SliceLengthEqual(n) =>
             check_match::Slice(n),
-        &SliceLengthGreaterOrEqual(before, after, _) =>
+        &SliceLengthGreaterOrEqual(before, after) =>
             check_match::SliceWithSubslice(before, after),
-        &Variant(_, _, def_id, _) =>
+        &Variant(_, _, def_id) =>
             check_match::Constructor::Variant(def_id)
     };
 
@@ -594,9 +608,9 @@ fn get_branches<'a, 'p, 'blk, 'tcx>(bcx: Block<'blk, 'tcx>,
             None => DebugLoc::None
         };
 
-        let opt = match cur.node {
+        let opt_kind = match cur.node {
             ast::PatLit(ref l) => {
-                ConstantValue(ConstantExpr(&**l), debug_loc)
+                ConstantValue(ConstantExpr(&**l))
             }
             ast::PatIdent(..) | ast::PatEnum(..) | ast::PatStruct(..) => {
                 // This is either an enum variant or a variable binding.
@@ -606,23 +620,25 @@ fn get_branches<'a, 'p, 'blk, 'tcx>(bcx: Block<'blk, 'tcx>,
                         let variant = ty::enum_variant_with_id(tcx, enum_id, var_id);
                         Variant(variant.disr_val,
                                 adt::represent_node(bcx, cur.id),
-                                var_id,
-                                debug_loc)
+                                var_id)
                     }
                     _ => continue
                 }
             }
             ast::PatRange(ref l1, ref l2) => {
-                ConstantRange(ConstantExpr(&**l1), ConstantExpr(&**l2), debug_loc)
+                ConstantRange(ConstantExpr(&**l1), ConstantExpr(&**l2))
             }
             ast::PatVec(ref before, None, ref after) => {
-                SliceLengthEqual(before.len() + after.len(), debug_loc)
+                SliceLengthEqual(before.len() + after.len())
             }
             ast::PatVec(ref before, Some(_), ref after) => {
-                SliceLengthGreaterOrEqual(before.len(), after.len(), debug_loc)
+                SliceLengthGreaterOrEqual(before.len(), after.len())
             }
             _ => continue
         };
+
+        let mut opt = Opt::new(opt_kind, debug_loc);
+        opt.is_likely = br.is_likely();
 
         if !found.iter().any(|x| x.eq(&opt, tcx)) {
             found.push(opt);
@@ -1057,7 +1073,6 @@ fn compile_submatch_continue<'a, 'p, 'blk, 'tcx>(mut bcx: Block<'blk, 'tcx>,
 
     let mut vals_left = vals[0..col].to_vec();
     vals_left.push_all(&vals[col + 1..]);
-    let ccx = bcx.fcx.ccx;
 
     // Find a real id (we're adding placeholder wildcard patterns, but
     // each column is guaranteed to have at least one real pattern)
@@ -1145,7 +1160,7 @@ fn compile_submatch_continue<'a, 'p, 'blk, 'tcx>(mut bcx: Block<'blk, 'tcx>,
     let mut test_val = val;
     debug!("test_val={}", bcx.val_to_string(test_val));
     if !opts.is_empty() {
-        match opts[0] {
+        match opts[0].kind {
             ConstantValue(..) | ConstantRange(..) => {
                 test_val = load_if_immediate(bcx, val, left_ty);
                 kind = if ty::type_is_integral(left_ty) {
@@ -1154,7 +1169,7 @@ fn compile_submatch_continue<'a, 'p, 'blk, 'tcx>(mut bcx: Block<'blk, 'tcx>,
                     Compare
                 };
             }
-            Variant(_, ref repr, _, _) => {
+            Variant(_, ref repr, _) => {
                 let (the_kind, val_opt) = adt::trans_switch(bcx, &**repr, val);
                 kind = the_kind;
                 if let Some(tval) = val_opt { test_val = tval; }
@@ -1167,7 +1182,7 @@ fn compile_submatch_continue<'a, 'p, 'blk, 'tcx>(mut bcx: Block<'blk, 'tcx>,
         }
     }
     for o in &opts {
-        match *o {
+        match o.kind {
             ConstantRange(..) => { kind = Compare; break },
             SliceLengthGreaterOrEqual(..) => { kind = CompareSliceLength; break },
             _ => ()
@@ -1177,15 +1192,17 @@ fn compile_submatch_continue<'a, 'p, 'blk, 'tcx>(mut bcx: Block<'blk, 'tcx>,
         NoBranch | Single => bcx,
         _ => bcx.fcx.new_temp_block("match_else")
     };
-    let sw = if kind == Switch {
-        build::Switch(bcx, test_val, else_cx.llbb, opts.len())
-    } else {
-        C_int(ccx, 0) // Placeholder for when not using a switch
-    };
+
+    // For storing the cases of a switch
+    let mut switch_cases = Vec::new();
+    // Hold onto the current block so we can generate the switch in the right place.
+    let start_bcx = bcx;
 
     let defaults = enter_default(else_cx, dm, m, col, val);
     let exhaustive = chk.is_infallible() && defaults.is_empty();
     let len = opts.len();
+
+    let mut likely_val = None;
 
     // Compile subtrees for each option
     for (i, opt) in opts.iter().enumerate() {
@@ -1204,7 +1221,12 @@ fn compile_submatch_continue<'a, 'p, 'blk, 'tcx>(mut bcx: Block<'blk, 'tcx>,
                 Switch => {
                     match opt.trans(bcx) {
                         SingleResult(r) => {
-                            AddCase(sw, r.val, opt_cx.llbb);
+                            // This is marked with #[likely], and is the first
+                            // one we've encountered, so store the value for later
+                            if opt.is_likely && likely_val.is_none() {
+                                likely_val = Some(r.val);
+                            }
+                            switch_cases.push((r.val, opt_cx.llbb));
                             bcx = r.bcx;
                         }
                         _ => {
@@ -1220,7 +1242,7 @@ fn compile_submatch_continue<'a, 'p, 'blk, 'tcx>(mut bcx: Block<'blk, 'tcx>,
                     } else {
                         tcx.types.usize // vector length
                     };
-                    let Result { bcx: after_cx, val: matches } = {
+                    let Result { bcx: after_cx, val: mut matches } = {
                         match opt.trans(bcx) {
                             SingleResult(Result { bcx, val }) => {
                                 compare_values(bcx, test_val, val, t, debug_loc)
@@ -1251,6 +1273,12 @@ fn compile_submatch_continue<'a, 'p, 'blk, 'tcx>(mut bcx: Block<'blk, 'tcx>,
                     if i + 1 < len && (guarded || multi_pats || kind == CompareSliceLength) {
                         branch_chk = Some(JumpToBasicBlock(bcx.llbb));
                     }
+
+                    // This arm is marked as likely, generate the hint
+                    if opt.is_likely {
+                        matches = expect_bool(after_cx, matches, true);
+                    }
+
                     CondBr(after_cx, matches, opt_cx.llbb, bcx.llbb, debug_loc);
                 }
                 _ => ()
@@ -1261,21 +1289,21 @@ fn compile_submatch_continue<'a, 'p, 'blk, 'tcx>(mut bcx: Block<'blk, 'tcx>,
 
         let mut size = 0;
         let mut unpacked = Vec::new();
-        match *opt {
-            Variant(disr_val, ref repr, _, _) => {
+        match opt.kind {
+            Variant(disr_val, ref repr, _) => {
                 let ExtractedBlock {vals: argvals, bcx: new_bcx} =
                     extract_variant_args(opt_cx, &**repr, disr_val, val);
                 size = argvals.len();
                 unpacked = argvals;
                 opt_cx = new_bcx;
             }
-            SliceLengthEqual(len, _) => {
+            SliceLengthEqual(len) => {
                 let args = extract_vec_elems(opt_cx, left_ty, len, 0, val);
                 size = args.vals.len();
                 unpacked = args.vals.clone();
                 opt_cx = args.bcx;
             }
-            SliceLengthGreaterOrEqual(before, after, _) => {
+            SliceLengthGreaterOrEqual(before, after) => {
                 let args = extract_vec_elems(opt_cx, left_ty, before, after, val);
                 size = args.vals.len();
                 unpacked = args.vals.clone();
@@ -1291,6 +1319,17 @@ fn compile_submatch_continue<'a, 'p, 'blk, 'tcx>(mut bcx: Block<'blk, 'tcx>,
                          &opt_vals[..],
                          branch_chk.as_ref().unwrap_or(chk),
                          has_genuine_default);
+    }
+
+    // Build the switch here, we do it down here so we can add a branch hint, if needed
+    if kind == Switch {
+        if let Some(likely_val) = likely_val {
+            test_val = expect(start_bcx, test_val, likely_val);
+        }
+        let sw = build::Switch(start_bcx, test_val, else_cx.llbb, opts.len());
+        for (val, llbb) in switch_cases {
+            AddCase(sw, val, llbb);
+        }
     }
 
     // Compile the fall-through case, if any
@@ -1313,6 +1352,37 @@ fn compile_submatch_continue<'a, 'p, 'blk, 'tcx>(mut bcx: Block<'blk, 'tcx>,
                                  has_genuine_default);
             }
         }
+    }
+
+    // Generates a call to an expect intrinsic, with the given constant.
+    // If the value isn't a valid type for the intrinsic, it will just return the value.
+    fn expect<'blk, 'tcx>(bcx: Block<'blk, 'tcx>,
+                          val: ValueRef, expected: ValueRef) -> ValueRef {
+        let ccx = bcx.ccx();
+
+        let val_type = val_ty(val);
+
+        if val_type.kind() != llvm::Integer {
+            return val;
+        }
+
+        let int_width = val_type.int_width();
+        let intrinsic_name = match int_width {
+            1  => "llvm.expect.i1",
+            8  => "llvm.expect.i8",
+            16 => "llvm.expect.i16",
+            32 => "llvm.expect.i32",
+            64 => "llvm.expect.i64",
+            _ => return val
+        };
+
+        let intrinsic = ccx.get_intrinsic(&intrinsic_name);
+        build::Call(bcx, intrinsic, &[val, expected], None, DebugLoc::None)
+    }
+    // Convenience helper for expects with a boolean value.
+    fn expect_bool<'blk, 'tcx>(bcx: Block<'blk, 'tcx>,
+                               val: ValueRef, expected: bool) -> ValueRef {
+        expect(bcx, val, C_bool(bcx.ccx(), expected))
     }
 }
 

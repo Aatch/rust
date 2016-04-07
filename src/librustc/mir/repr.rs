@@ -327,6 +327,9 @@ pub enum TerminatorKind<'tcx> {
         /// Cleanups to be done if the call unwinds.
         cleanup: Option<BasicBlock>
     },
+
+    /// Represents an unreachable location in execution.
+    Unreachable,
 }
 
 impl<'tcx> Terminator<'tcx> {
@@ -349,6 +352,7 @@ impl<'tcx> TerminatorKind<'tcx> {
             SwitchInt { targets: ref b, .. } => b[..].into_cow(),
             Resume => (&[]).into_cow(),
             Return => (&[]).into_cow(),
+            Unreachable => (&[]).into_cow(),
             Call { destination: Some((_, t)), cleanup: Some(c), .. } => vec![t, c].into_cow(),
             Call { destination: Some((_, ref t)), cleanup: None, .. } =>
                 slice::ref_slice(t).into_cow(),
@@ -370,6 +374,7 @@ impl<'tcx> TerminatorKind<'tcx> {
             SwitchInt { targets: ref mut b, .. } => b.iter_mut().collect(),
             Resume => Vec::new(),
             Return => Vec::new(),
+            Unreachable => Vec::new(),
             Call { destination: Some((_, ref mut t)), cleanup: Some(ref mut c), .. } => vec![t, c],
             Call { destination: Some((_, ref mut t)), cleanup: None, .. } => vec![t],
             Call { destination: None, cleanup: Some(ref mut c), .. } => vec![c],
@@ -442,6 +447,7 @@ impl<'tcx> TerminatorKind<'tcx> {
             SwitchInt { discr: ref lv, .. } => write!(fmt, "switchInt({:?})", lv),
             Return => write!(fmt, "return"),
             Resume => write!(fmt, "resume"),
+            Unreachable => write!(fmt, "unreachable"),
             Drop { ref value, .. } => write!(fmt, "drop({:?})", value),
             Call { ref func, ref args, ref destination, .. } => {
                 if let Some((ref destination, _)) = *destination {
@@ -463,7 +469,7 @@ impl<'tcx> TerminatorKind<'tcx> {
     pub fn fmt_successor_labels(&self) -> Vec<Cow<'static, str>> {
         use self::TerminatorKind::*;
         match *self {
-            Return | Resume => vec![],
+            Return | Resume | Unreachable => vec![],
             Goto { .. } => vec!["".into()],
             If { .. } => vec!["true".into(), "false".into()],
             Switch { ref adt_def, .. } => {

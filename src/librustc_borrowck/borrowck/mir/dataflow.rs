@@ -412,7 +412,8 @@ impl<D: BitDenotation> DataflowState<D> {
     {
         match bb.terminator().kind {
             repr::TerminatorKind::Return |
-            repr::TerminatorKind::Resume => {}
+            repr::TerminatorKind::Resume |
+            repr::TerminatorKind::Unreachable => {}
             repr::TerminatorKind::Goto { ref target } |
             repr::TerminatorKind::Drop { ref target, value: _, unwind: None } => {
                 self.propagate_bits_into_entry_set_for(in_out, changed, target);

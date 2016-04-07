@@ -380,7 +380,8 @@ impl<'a, 'tcx> TypeChecker<'a, 'tcx> {
             TerminatorKind::Goto { .. } |
             TerminatorKind::Resume |
             TerminatorKind::Return |
-            TerminatorKind::Drop { .. } => {
+            TerminatorKind::Drop { .. } |
+            TerminatorKind::Unreachable => {
                 // no checks needed for these
             }
 

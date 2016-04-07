@@ -577,7 +577,9 @@ fn gather_moves<'tcx>(mir: &Mir<'tcx>, tcx: &TyCtxt<'tcx>) -> MoveData<'tcx> {
         }
 
         match bb_data.terminator().kind {
-            TerminatorKind::Goto { target: _ } | TerminatorKind::Resume => { }
+            TerminatorKind::Goto { target: _ } |
+            TerminatorKind::Resume |
+            TerminatorKind::Unreachable => { }
 
             TerminatorKind::Return => {
                 let source = Location { block: bb,

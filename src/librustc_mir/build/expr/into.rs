@@ -400,6 +400,10 @@ impl<'a,'tcx> Builder<'a,'tcx> {
 
                 block.and(true)
             }
+            "unreachable" => {
+                self.cfg.terminate(block, scope_id, expr_span, TerminatorKind::Unreachable);
+                self.cfg.start_new_block().and(true)
+            }
             _ => block.and(false)
 
         }

@@ -331,6 +331,9 @@ impl<'bcx, 'tcx> MirContext<'bcx, 'tcx> {
                     }
                 }
             }
+            mir::TerminatorKind::Unreachable => {
+                bcx.unreachable();
+            }
         }
     }
 

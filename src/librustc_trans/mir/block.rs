@@ -190,14 +190,7 @@ impl<'bcx, 'tcx> MirContext<'bcx, 'tcx> {
                 }
 
                 if intrinsic == Some("transmute") {
-                    let &(ref dest, target) = destination.as_ref().unwrap();
-                    self.with_lvalue_ref(&bcx, dest, |this, dest| {
-                        this.trans_transmute(&bcx, &args[0], dest);
-                    });
-
-                    self.set_operand_dropped(&bcx, &args[0]);
-                    funclet_br(bcx, self.llblock(target));
-                    return;
+                    bug!("transmute intrinsic should be lowered to a BitCast");
                 }
 
                 let extra_args = &args[sig.0.inputs.len()..];
@@ -593,28 +586,6 @@ impl<'bcx, 'tcx> MirContext<'bcx, 'tcx> {
         } else {
             ReturnDest::Store(dest.llval)
         }
-    }
-
-    fn trans_transmute(&mut self, bcx: &BlockAndBuilder<'bcx, 'tcx>,
-                       src: &mir::Operand<'tcx>, dst: LvalueRef<'tcx>) {
-        let mut val = self.trans_operand(bcx, src);
-        if let ty::TyFnDef(def_id, substs, _) = val.ty.sty {
-            let llouttype = type_of::type_of(bcx.ccx(), dst.ty.to_ty(bcx.tcx()));
-            let out_type_size = llbitsize_of_real(bcx.ccx(), llouttype);
-            if out_type_size != 0 {
-                // FIXME #19925 Remove this hack after a release cycle.
-                let f = Callee::def(bcx.ccx(), def_id, substs);
-                let datum = f.reify(bcx.ccx());
-                val = OperandRef {
-                    val: OperandValue::Immediate(datum.val),
-                    ty: datum.ty
-                };
-            }
-        }
-
-        let llty = type_of::type_of(bcx.ccx(), val.ty);
-        let cast_ptr = bcx.pointercast(dst.llval, llty.ptr_to());
-        self.store_operand(bcx, cast_ptr, val);
     }
 
     // Stores the return value of a function call into it's final location.

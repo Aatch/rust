@@ -790,6 +790,10 @@ pub enum CastKind {
     /// `&[i32;N]` to a `&[i32]`, or a `Box<T>` to a `Box<Trait>`
     /// (presuming `T: Trait`).
     Unsize,
+
+    /// A bitcast from one type to another type of the same size.
+    /// This is produced by a lowering of the "transmute" intrinsic
+    BitCast,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, RustcEncodable, RustcDecodable)]

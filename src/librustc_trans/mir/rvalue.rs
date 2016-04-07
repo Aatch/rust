@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use llvm::ValueRef;
+use llvm::{self, ValueRef};
 use rustc::ty::{self, Ty};
 use rustc::ty::cast::{CastTy, IntTy};
 use middle::const_val::ConstVal;
@@ -29,6 +29,7 @@ use type_of;
 use tvec;
 use value::Value;
 use Disr;
+use machine::llbitsize_of_real;
 
 use super::MirContext;
 use super::operand::{OperandRef, OperandValue};
@@ -93,6 +94,27 @@ impl<'bcx, 'tcx> MirContext<'bcx, 'tcx> {
                     }
                 });
                 self.set_operand_dropped(&bcx, source);
+                bcx
+            }
+            mir::Rvalue::Cast(mir::CastKind::BitCast, ref source, _) => {
+                let mut val = self.trans_operand(&bcx, source);
+                if let ty::TyFnDef(def_id, substs, _) = val.ty.sty {
+                    let llouttype = type_of::type_of(bcx.ccx(), dest.ty.to_ty(bcx.tcx()));
+                    let out_type_size = llbitsize_of_real(bcx.ccx(), llouttype);
+                    if out_type_size != 0 {
+                        // FIXME #19925 Remove this hack after a release cycle.
+                        let f = Callee::def(bcx.ccx(), def_id, substs);
+                        let datum = f.reify(bcx.ccx());
+                        val = OperandRef {
+                            val: OperandValue::Immediate(datum.val),
+                            ty: datum.ty
+                        };
+                    }
+                }
+
+                let llty = type_of::type_of(bcx.ccx(), val.ty);
+                let cast_ptr = bcx.pointercast(dest.llval, llty.ptr_to());
+                self.store_operand(&bcx, cast_ptr, val);
                 bcx
             }
 
@@ -225,7 +247,7 @@ impl<'bcx, 'tcx> MirContext<'bcx, 'tcx> {
     }
 
     pub fn trans_rvalue_operand(&mut self,
-                                bcx: BlockAndBuilder<'bcx, 'tcx>,
+                                mut bcx: BlockAndBuilder<'bcx, 'tcx>,
                                 rvalue: &mir::Rvalue<'tcx>)
                                 -> (BlockAndBuilder<'bcx, 'tcx>, OperandRef<'tcx>)
     {
@@ -362,6 +384,47 @@ impl<'bcx, 'tcx> MirContext<'bcx, 'tcx> {
                             }
                         } else {
                             bug!("Unexpected non-FatPtr operand")
+                        }
+                    }
+                    mir::CastKind::BitCast => {
+                        if operand.ty == cast_ty {
+                            return (bcx, operand);
+                        }
+
+                        let from_ty = operand.ty;
+
+                        let llfrom_ty = type_of::type_of(bcx.ccx(), from_ty);
+                        let llcast_ty = type_of::type_of(bcx.ccx(), cast_ty);
+
+                        let nonpointer_nonaggregate = |llkind: llvm::TypeKind| -> bool {
+                            use llvm::TypeKind::*;
+                            match llkind {
+                                Half | Float | Double | X86_FP80 | FP128 |
+                                PPC_FP128 | Integer | Vector | X86_MMX => true,
+                                _ => false
+                            }
+                        };
+
+                        let llfrom_kind = llfrom_ty.kind();
+                        let llcast_kind = llcast_ty.kind();
+
+                        // Handle simple immediate -> immediate transmutes
+                        let do_bitcast =
+                            (nonpointer_nonaggregate(llfrom_kind) &&
+                             nonpointer_nonaggregate(llcast_kind)) ||
+                            (llfrom_kind == llvm::TypeKind::Pointer &&
+                             llcast_kind == llvm::TypeKind::Pointer);
+                        if do_bitcast {
+                            let cast = bcx.bitcast(operand.immediate(), llcast_ty);
+                            OperandValue::Immediate(cast)
+                        } else {
+                            // More complex transmutes go through the `trans_rvalue` path.
+                            let temp_lvalue = LvalueRef::alloca(&bcx,
+                                                                cast_ty,
+                                                                "bitcast_tmp");
+                            bcx = self.trans_rvalue(bcx, temp_lvalue, rvalue);
+                            let operand = self.trans_load(&bcx, temp_lvalue.llval, cast_ty);
+                            return (bcx, operand);
                         }
                     }
                 };

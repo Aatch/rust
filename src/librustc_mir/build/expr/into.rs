@@ -17,6 +17,7 @@ use hair::*;
 use rustc::middle::region::CodeExtent;
 use rustc::ty;
 use rustc::mir::repr::*;
+use syntax::ast;
 use syntax::codemap::Span;
 
 impl<'a,'tcx> Builder<'a,'tcx> {
@@ -266,6 +267,21 @@ impl<'a,'tcx> Builder<'a,'tcx> {
                 this.cfg.start_new_block().unit()
             }
             ExprKind::Call { ty, fun, args } => {
+                if let Some(intrinsic) = this.get_intrinsic_name(ty) {
+                    let intrinsic = &intrinsic.as_str()[..];
+
+                    let sig = if let ty::TyFnDef(_, _, ref f) = ty.sty {
+                        &f.sig.0
+                    } else {
+                        bug!("intrinsic call is not a bare function");
+                    };
+
+                    let lowered = unpack!(block = this.lower_intrinsic(
+                        block, expr_span, intrinsic, sig, destination, &args));
+                    if lowered {
+                        return block.unit();
+                    }
+                }
                 let diverges = match ty.sty {
                     ty::TyFnDef(_, _, ref f) | ty::TyFnPtr(ref f) => {
                         f.sig.0.output.diverges()
@@ -275,8 +291,8 @@ impl<'a,'tcx> Builder<'a,'tcx> {
                 let fun = unpack!(block = this.as_operand(block, fun));
                 let args: Vec<_> =
                     args.into_iter()
-                        .map(|arg| unpack!(block = this.as_operand(block, arg)))
-                        .collect();
+                    .map(|arg| unpack!(block = this.as_operand(block, arg)))
+                    .collect();
 
                 let success = this.cfg.start_new_block();
                 let cleanup = this.diverge_cleanup();
@@ -341,5 +357,38 @@ impl<'a,'tcx> Builder<'a,'tcx> {
         };
         self.exit_scope(span, extent, block, exit_block);
         self.cfg.start_new_block().unit()
+    }
+
+    fn get_intrinsic_name(&self, ty: ty::Ty<'tcx>) -> Option<ast::Name> {
+        use syntax::abi::Abi;
+
+        if let ty::TyFnDef(def_id, _, f) = ty.sty {
+            if f.abi == Abi::RustIntrinsic || f.abi == Abi::PlatformIntrinsic {
+                return Some(self.hir.tcx().item_name(def_id));
+            }
+        }
+
+        None
+    }
+
+    fn lower_intrinsic(&mut self, mut block: BasicBlock,
+                       expr_span: Span,
+                       name: &str, sig: &ty::FnSig<'tcx>,
+                       dest: &Lvalue<'tcx>, args: &[ExprRef<'tcx>]) -> BlockAnd<bool> {
+        let scope_id = self.innermost_scope_id();
+
+        match name {
+            "transmute" => {
+                let ret_ty = sig.output.unwrap();
+                let arg = args[0].clone();
+                let arg = unpack!(block = self.as_operand(block, arg));
+                let cast = Rvalue::Cast(CastKind::BitCast, arg, ret_ty);
+                self.cfg.push_assign(block, scope_id, expr_span,
+                                     dest, cast);
+                block.and(true)
+            }
+            _ => block.and(false)
+
+        }
     }
 }

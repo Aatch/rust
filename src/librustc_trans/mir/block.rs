@@ -179,14 +179,7 @@ impl<'bcx, 'tcx> MirContext<'bcx, 'tcx> {
                 let intrinsic = intrinsic.as_ref().map(|s| &s[..]);
 
                 if intrinsic == Some("move_val_init") {
-                    let &(_, target) = destination.as_ref().unwrap();
-                    // The first argument is a thin destination pointer.
-                    let llptr = self.trans_operand(&bcx, &args[0]).immediate();
-                    let val = self.trans_operand(&bcx, &args[1]);
-                    self.store_operand(&bcx, llptr, val);
-                    self.set_operand_dropped(&bcx, &args[1]);
-                    funclet_br(bcx, self.llblock(target));
-                    return;
+                    bug!("move_val_intrinsic intrinsic should be lowered to an assignment");
                 }
 
                 if intrinsic == Some("transmute") {

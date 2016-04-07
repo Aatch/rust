@@ -387,6 +387,19 @@ impl<'a,'tcx> Builder<'a,'tcx> {
                                      dest, cast);
                 block.and(true)
             }
+            "move_val_init" => {
+                let dest = args[0].clone();
+                let src = args[1].clone();
+
+                let dest = unpack!(block = self.as_lvalue(block, dest));
+                let dest = dest.deref();
+
+                let src = unpack!(block = self.as_rvalue(block, src));
+
+                self.cfg.push_assign(block, scope_id, expr_span, &dest, src);
+
+                block.and(true)
+            }
             _ => block.and(false)
 
         }
